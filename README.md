@@ -11,7 +11,7 @@ but extremely clever imitation to ensure excruciating faithfulness to the games 
 Endless hours of painstaking effort have gone into ensuring the accuracy of each of these games.
 
 ## NOTE
-Wii version have some games not present in original version. These games was developed from scratch.
+Wii version has some games not present in original version. These games was developed from scratch.
 
 ## CREDITS
 Thanks to Peter Hirschberg for the original source code.
