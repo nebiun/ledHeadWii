@@ -177,9 +177,6 @@ void SubChase_Run(int tu)
 	}
 
 	// run the game
-
-	BOOL bHit = FALSE;
-
 	BOOL bChange;
 	if (SubChase_GetInputLEFT(&bChange))
 	{

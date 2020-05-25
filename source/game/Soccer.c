@@ -33,11 +33,8 @@ Website : http://www.peterhirschberg.com
 
 */
 
-
-
 #include "Soccer.h"
 #include "Games.h"
-
 
 // constants
 
@@ -133,18 +130,6 @@ static PLAYER defense[NUM_DEFENSEPLAYERS];
 	p.nColumn++; \
 }
 
-static BOOL ISBALL(int x, int y);
-static BOOL ISBALL(int x, int y)
-{
-	if ((ball.nColumn == x)
-		&& (ball.nRow == y)
-		&& (ball.nBright)){
-		return TRUE;
-	}
-	return FALSE;
-}
-
-static BOOL ISPLAYER(int x, int y);
 static BOOL ISPLAYER(int x, int y)
 {
 	if ((player.nColumn == x)
@@ -155,7 +140,6 @@ static BOOL ISPLAYER(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISDEFENSE(int x, int y);
 static BOOL ISDEFENSE(int x, int y)
 {
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
@@ -168,7 +152,6 @@ static BOOL ISDEFENSE(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISOCCUPIED(int x, int y);
 static BOOL ISOCCUPIED(int x, int y)
 {
 	if (ISPLAYER(x,y)){
@@ -178,18 +161,6 @@ static BOOL ISOCCUPIED(int x, int y)
 		return TRUE;
 	}
 	return FALSE;
-}
-
-static int GETPLAYERAT(int x, int y);
-static int GETPLAYERAT(int x, int y){
-	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
-		if ((defense[i].nColumn == x)
-			&& (defense[i].nRow == y)
-			&& (defense[i].nBright)){
-			return i;
-		}
-	}
-	return -1;
 }
 
 #define UNMOVEPLAYER(p) { \
@@ -224,7 +195,6 @@ static void fsmInPlay();
 static void fsmGoal();
 static void fsmGameOver();
 
-
 static enum FSM {
 	FSM_PLAYSTARTWAIT=0,
 	FSM_SHOWSTATS,
@@ -243,43 +213,7 @@ static FSMFCN fsmfcn[] = {
 	fsmGameOver
 };
 
-
-// proto's
-static void InitGame();
-static void DrawBlips();
-static void EraseBlips();
-
-
-BOOL Soccer_GetPower()
-{
-	return (bPower ? TRUE : FALSE);
-}
-
-void Soccer_PowerOn()
-{
-	InitGame();
-	bPower = TRUE;
-}
-
-void Soccer_PowerOff()
-{
-	bPower = FALSE;
-	Soccer_StopSound();
-}
-
-void Soccer_SetSkill(int i){
-	if (i == 0){
-		bPro2 = FALSE;
-	} else {
-		bPro2 = TRUE;
-	}
-}
-
-int Soccer_GetSkill(){
-	return bPro2 ? 1 : 0;
-}
-
-void InitGame()
+static void InitGame()
 {
 	bHomeTeam = FALSE;
 	PlatformSetInput(bHomeTeam);
@@ -294,39 +228,7 @@ void InitGame()
 	fsm = FSM_PLAYSTARTWAIT;
 }
 
-void Soccer_Run(int tu)
-{
-	int x, y;
-
-	// prevent reentrancy
-	if (bInFrame){ return; }
-	bInFrame = TRUE;
-
-	// init the blips field
-	for (y = 0; y < SOCCER_BLIP_ROWS; y++){
-		for (x = 0; x < SOCCER_BLIP_COLUMNS; x++){
-			Blips[x][y] = BLIP_OFF;
-		}
-	}
-
-	if (!bPower){
-		Soccer_ClearScreen();
-		bInFrame = FALSE;
-		return;
-	}
-	Platform_StartDraw();
-
-	(fsmfcn[fsm])();
-
-	DrawBlips();
-
-	Platform_EndDraw();
-
-	bInFrame = FALSE;
-
-}
-
-void DrawBlips()
+static void DrawBlips()
 {
 	int x, y, nBright;
 	static BOOL bBlink = FALSE;
@@ -388,14 +290,65 @@ void DrawBlips()
 	bBlink = !bBlink;
 }
 
-void EraseBlips()
+BOOL Soccer_GetPower()
 {
-	// erase the blips field
-	for (int y = 0; y < SOCCER_BLIP_ROWS; y++){
-		for (int x = 0; x < SOCCER_BLIP_COLUMNS; x++){
-			Soccer_DrawBlip(BLIP_OFF, x, y);
+	return (bPower ? TRUE : FALSE);
+}
+
+void Soccer_PowerOn()
+{
+	InitGame();
+	bPower = TRUE;
+}
+
+void Soccer_PowerOff()
+{
+	bPower = FALSE;
+	Soccer_StopSound();
+}
+
+void Soccer_SetSkill(int i){
+	if (i == 0){
+		bPro2 = FALSE;
+	} else {
+		bPro2 = TRUE;
+	}
+}
+
+int Soccer_GetSkill(){
+	return bPro2 ? 1 : 0;
+}
+
+void Soccer_Run(int tu)
+{
+	int x, y;
+
+	// prevent reentrancy
+	if (bInFrame){ return; }
+	bInFrame = TRUE;
+
+	// init the blips field
+	for (y = 0; y < SOCCER_BLIP_ROWS; y++){
+		for (x = 0; x < SOCCER_BLIP_COLUMNS; x++){
+			Blips[x][y] = BLIP_OFF;
 		}
 	}
+
+	if (!bPower){
+		Soccer_ClearScreen();
+		bInFrame = FALSE;
+		return;
+	}
+	Platform_StartDraw();
+
+	(fsmfcn[fsm])();
+
+	DrawBlips();
+
+	Platform_EndDraw();
+
+	bInFrame = FALSE;
+
 }
 
 // FINITE STATE MACHINE STUFF
@@ -758,19 +711,7 @@ void fsmInPlay()
 			{
 				nDefenderLast = nDefender;
 
-				PLAYER *pDefender;
-				switch(nDefender)
-				{
-					case 0:
-						pDefender = &defense[3];
-						break;
-					case 1:
-						pDefender = &defense[4];
-						break;
-					case 2:
-						pDefender = &defense[5];
-						break;
-				}
+				PLAYER *pDefender = &defense[3 + nDefender];
 
 				int dx = pDefender->nColumn;
 				int dy = pDefender->nRow;

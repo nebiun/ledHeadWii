@@ -50,8 +50,9 @@ Website : http://www.peterhirschberg.com
 #define AUTORACE_SOUND_HIT			4
 #define AUTORACE_SOUND_TIME			5
 #define AUTORACE_SOUND_WIN			6
+#define AUTORACE_SOUND_NSOUNDS		7
 
-void AutoRace_Run();
+void AutoRace_Run(int tu);
 void AutoRace_SetSkill(int i);
 int AutoRace_GetSkill();
 void AutoRace_PowerOn();

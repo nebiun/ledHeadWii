@@ -33,7 +33,6 @@ Website : http://www.peterhirschberg.com
 
 */
 
-
 #ifndef __GAMES_H__
 #define __GAMES_H__
 
@@ -51,9 +50,11 @@ Website : http://www.peterhirschberg.com
 #define GAME_SOCCER				10
 #define GAME_SOCCER2			11
 #define GAME_SPACEALERT			12
-#define GAME_SUBCHASE			13
+#define GAME_MISSILEATTACK		13
+#define GAME_SUBCHASE			14
 
-#define NUM_GAMES				14	
+
+#define NUM_GAMES				15
 
 typedef struct GAMECONTEXT
 {
@@ -64,7 +65,6 @@ typedef struct GAMECONTEXT
 	int tu;
 
 	char *szName;
-	char *szDir;
 
 	void (*Init)(void);
 	void (*DeInit)(void);
@@ -78,6 +78,7 @@ typedef struct GAMECONTEXT
 	void (*GetSize)(int *w, int *h);
 	const u8 *screen;
 	void (*Help)(void);
+	void (*Debug)(int f);
 }GAMECONTEXT;
 
 extern GAMECONTEXT gGameContext[NUM_GAMES];

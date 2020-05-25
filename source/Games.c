@@ -39,11 +39,13 @@ Website : http://www.peterhirschberg.com
 #include "autorace.h"
 #include "spacealert.h"
 #include "basketball.h"
+#include "basketball2.h"
 #include "football.h"
 #include "football2.h"
 #include "hockey.h"
 #include "hockeyca.h"
 #include "soccer.h"
+#include "soccer2.h"
 #include "armorbattle.h"
 #include "baseball.h"
 #include "subchase.h"
@@ -51,15 +53,19 @@ Website : http://www.peterhirschberg.com
 #include "autorace_screen_png.h"
 #include "baseball_screen_png.h"
 #include "basketball_screen_png.h"
+#include "basketball2_screen_png.h"
 #include "football_screen_png.h"
 #include "football2_screen_png.h"
 #include "hockey_screen_png.h"
 #include "hockeyca_screen_png.h"
 #include "skislalom_screen_png.h"
 #include "soccer_screen_png.h"
+#include "soccer2_screen_png.h"
 #include "spacealert_screen_png.h"
+#include "missileattack_screen_png.h"
 #include "subchase_screen_png.h"
-#include "nodisp_screen_png.h"
+
+//#define DEEP_DEBUG	1
 
 GAMECONTEXT gGameContext[NUM_GAMES] = 
 {
@@ -67,8 +73,7 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 	{
 		GAME_ARMORBATTLE,
 		150,		
-		"Armor Battle",
-		"armorbattle",
+		"Armor Battle (1978)",
 		ArmorBattle_Init,
 		ArmorBattle_DeInit,
 		ArmorBattle_Run,
@@ -81,13 +86,13 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		ArmorBattle_GetSize,
 		armorbattle_screen_png,
 		ArmorBattle_Help,
+		NULL
 	},
 	// auto race
 	{
 		GAME_AUTORACE,
 		100,//65
-		"Auto Race",
-		"autorace",
+		"Auto Race (1976)",
 		AutoRace_Init,
 		AutoRace_DeInit,
 		AutoRace_Run,
@@ -99,14 +104,14 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		AutoRace_Paint,
 		AutoRace_GetSize,
 		autorace_screen_png,
-		AutoRace_Help
+		AutoRace_Help,
+		NULL
 	},
 	// baseball
 	{
 		GAME_BASEBALL,
-		10,
-		"Baseball",
-		"baseball",
+		1,
+		"Baseball (1978)",
 		Baseball_Init,
 		Baseball_DeInit,
 		Baseball_Run,
@@ -118,14 +123,18 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		Baseball_Paint,
 		Baseball_GetSize,
 		baseball_screen_png,
-		Baseball_Help
+		Baseball_Help,
+#ifdef DEEP_DEBUG
+		Baseball_Debug
+#else
+		NULL
+#endif
 	},
 	// basketball
 	{
 		GAME_BASKETBALL,
 		60,
-		"Basketball",
-		"basketball",
+		"Basketball (1978)",
 		Basketball_Init,
 		Basketball_DeInit,
 		Basketball_Run,
@@ -137,33 +146,37 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		Basketball_Paint,
 		Basketball_GetSize,
 		basketball_screen_png,
-		Basketball_Help
+		Basketball_Help,
+		NULL
 	},
 	// basketball 2
 	{
 		GAME_BASKETBALL2,
-		0,
-		"Basketball II",
-		"basketball2",
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		nodisp_screen_png,
+		60,
+		"Basketball 2 (1979)",
+		Basketball2_Init,
+		Basketball2_DeInit,
+		Basketball2_Run,
+		Basketball2_SetSkill,
+		Basketball2_GetSkill,
+		Basketball2_PowerOn,
+		Basketball2_PowerOff,
+		Basketball2_GetPower,
+		Basketball2_Paint,
+		Basketball2_GetSize,
+		basketball2_screen_png,
+		Basketball2_Help,
+#ifdef DEEP_DEBUG
+		Basketball2_Debug
+#else
 		NULL
+#endif
 	},
 	// football
 	{
 		GAME_FOOTBALL,
 		55,
-		"Football",
-		"football",
+		"Football (1977)",
 		Football_Init,
 		Football_DeInit,
 		Football_Run,
@@ -176,13 +189,13 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		Football_GetSize,
 		football_screen_png,
 		Football_Help,
+		NULL
 	},
 	// football 2
 	{
 		GAME_FOOTBALL2,
 		50,
-		"Football II",
-		"football2",
+		"Football II (1978)",
 		Football2_Init,
 		Football2_DeInit,
 		Football2_Run,
@@ -195,13 +208,17 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		Football2_GetSize,
 		football2_screen_png,
 		Football2_Help,
+#ifdef DEEP_DEBUG
+		Football2_Debug
+#else
+		NULL
+#endif		
 	},
 	// hockey
 	{
 		GAME_HOCKEY,
 		60,
-		"Hockey",
-		"hockey",
+		"Hockey (1978)",
 		Hockey_Init,
 		Hockey_DeInit,
 		Hockey_Run,
@@ -213,14 +230,14 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		Hockey_Paint,
 		Hockey_GetSize,
 		hockey_screen_png,
-		Hockey_Help
+		Hockey_Help,
+		NULL
 	},
 	// hockey (canadian)
 	{
 		GAME_HOCKEYCA,
 		60,
-		"Hockey (Canadian)",
-		"hockeyca",
+		"Hockey (Canadian) (1978)",
 		HockeyCa_Init,
 		HockeyCa_DeInit,
 		HockeyCa_Run,
@@ -232,14 +249,14 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		HockeyCa_Paint,
 		HockeyCa_GetSize,
 		hockeyca_screen_png,
-		HockeyCa_Help
+		HockeyCa_Help,
+		NULL
 	},
 	// ski slalom
 	{
 		GAME_SKISLALOM,
 		65,
-		"Ski Slalom",
-		"skislalom",
+		"Ski Slalom (1980)",
 		SkiSlalom_Init,
 		AutoRace_DeInit,
 		AutoRace_Run,
@@ -251,14 +268,14 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		AutoRace_Paint,
 		AutoRace_GetSize,
 		skislalom_screen_png,
-		SkiSlalom_Help
+		SkiSlalom_Help,
+		NULL
 	},
 	// soccer
 	{
 		GAME_SOCCER,
 		60,
-		"Soccer",
-		"soccer",
+		"Soccer (1978)",
 		Soccer_Init,
 		Soccer_DeInit,
 		Soccer_Run,
@@ -270,33 +287,37 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		Soccer_Paint,
 		Soccer_GetSize,
 		soccer_screen_png,
-		Soccer_Help
+		Soccer_Help,
+		NULL
 	},
 	// soccer 2
 	{
 		GAME_SOCCER2,
-		0,
-		"Soccer II",
-		"soccer2",
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		nodisp_screen_png,
+		60,
+		"Soccer 2 (1979)",
+		Soccer2_Init,
+		Soccer2_DeInit,
+		Soccer2_Run,
+		Soccer2_SetSkill,
+		Soccer2_GetSkill,
+		Soccer2_PowerOn,
+		Soccer2_PowerOff,
+		Soccer2_GetPower,
+		Soccer2_Paint,
+		Soccer2_GetSize,
+		soccer2_screen_png,
+		Soccer2_Help,
+#ifdef DEEP_DEBUG
+		Soccer2_Debug
+#else
 		NULL
+#endif
 	},
 	// space alert
 	{
 		GAME_SPACEALERT,
 		110,
-		"Space Alert",
-		"spacealert",
+		"Space Alert (1978)",
 		SpaceAlert_Init,
 		SpaceAlert_DeInit,
 		SpaceAlert_Run,
@@ -308,14 +329,41 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		SpaceAlert_Paint,
 		SpaceAlert_GetSize,
 		spacealert_screen_png,
-		SpaceAlert_Help
+		SpaceAlert_Help,
+#ifdef DEEP_DEBUG
+		SpaceAlert_Debug
+#else
+		NULL
+#endif
+	},
+	// missile attack
+	{
+		GAME_MISSILEATTACK,
+		110,
+		"Missile Attack (1977)",
+		MissileAttack_Init,
+		SpaceAlert_DeInit,
+		SpaceAlert_Run,
+		NULL,
+		NULL,
+		SpaceAlert_PowerOn,
+		SpaceAlert_PowerOff,
+		SpaceAlert_GetPower,
+		SpaceAlert_Paint,
+		SpaceAlert_GetSize,
+		missileattack_screen_png,
+		MissileAttack_Help,
+#ifdef DEEP_DEBUG
+		SpaceAlert_Debug
+#else
+		NULL
+#endif
 	},
 	// subchase
 	{
 		GAME_SUBCHASE,
 		60,
-		"Sub Chase",
-		"subchase",
+		"Sub Chase (1978)",
 		SubChase_Init,
 		SubChase_DeInit,
 		SubChase_Run,
@@ -327,7 +375,8 @@ GAMECONTEXT gGameContext[NUM_GAMES] =
 		SubChase_Paint,
 		SubChase_GetSize,
 		subchase_screen_png,
-		SubChase_Help
+		SubChase_Help,
+		NULL
 	}
 };
 

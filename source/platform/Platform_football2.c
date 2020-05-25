@@ -35,9 +35,6 @@ Website : http://www.peterhirschberg.com
 
 #include "football2.h"
 #include "football2_screen_png.h"
-#include "football2_poweroff_png.h"
-#include "football2_pro1_png.h"
-#include "football2_pro2_png.h"
 #include "football2_chargestart_raw.h"
 #include "football2_charge_raw.h"
 #include "football2_tick_raw.h"
@@ -51,11 +48,8 @@ Website : http://www.peterhirschberg.com
 	
 // images
 static GRRLIB_texImg *bmpScreen;
-static GRRLIB_texImg *bmpPowerOff;
-static GRRLIB_texImg *bmpPro1;
-static GRRLIB_texImg *bmpPro2;
 
-static Sound_t tcWaveRes[10];
+static Sound_t tcWaveRes[FOOTBALL2_SOUND_NSOUNDS];
 static Blip_t blip[FOOTBALL2_BLIP_COLUMNS][FOOTBALL2_BLIP_ROWS];
 static Digit_t digit[7] = { 
 	{football2_digit_x, football2_digit_y, -1},
@@ -89,27 +83,23 @@ void Football2_Init()
 {
 	int x, y;
 	
-	if (bInited) return;
+	if (bInited) 
+		return;
 	
 	// Init sounds
-	Sound_set(&tcWaveRes[0], football2_chargestart_raw, football2_chargestart_raw_size, 865 );
-	Sound_set(&tcWaveRes[1], football2_charge_raw, football2_charge_raw_size, 946 );
-	Sound_set(&tcWaveRes[2], football2_tick_raw, football2_tick_raw_size, 12 );
-	Sound_set(&tcWaveRes[3], football2_runback_raw, football2_runback_raw_size, 260 );
-	Sound_set(&tcWaveRes[4], football2_firstdown_raw, football2_firstdown_raw_size, 138 );
-	Sound_set(&tcWaveRes[5], football2_endplay_raw, football2_endplay_raw_size, 334 );
-	Sound_set(&tcWaveRes[6], football2_endpossession_raw, football2_endpossession_raw_size, 700 );
-	Sound_set(&tcWaveRes[7], football2_endquarter_raw, football2_endquarter_raw_size, 995 );
-	Sound_set(&tcWaveRes[8], football2_touchdown_raw, football2_touchdown_raw_size, 2566 );
-	Sound_set(&tcWaveRes[9], football2_safety_raw, football2_safety_raw_size, 726 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_CHARGESTART], football2_chargestart_raw, football2_chargestart_raw_size, 865 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_CHARGE], football2_charge_raw, football2_charge_raw_size, 946 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_TICK], football2_tick_raw, football2_tick_raw_size, 12 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_RUNBACK], football2_runback_raw, football2_runback_raw_size, 260 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_FIRSTDOWN], football2_firstdown_raw, football2_firstdown_raw_size, 138 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_ENDPLAY], football2_endplay_raw, football2_endplay_raw_size, 334 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_ENDPOSSESSION], football2_endpossession_raw, football2_endpossession_raw_size, 700 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_ENDQUARTER], football2_endquarter_raw, football2_endquarter_raw_size, 995 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_TOUCHDOWN], football2_touchdown_raw, football2_touchdown_raw_size, 2566 );
+	Sound_set(&tcWaveRes[FOOTBALL2_SOUND_SAFETY], football2_safety_raw, football2_safety_raw_size, 726 );
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(football2_screen_png);
-
-	// set up the power switch images
-	bmpPowerOff = GRRLIB_LoadTexture(football2_poweroff_png);
-	bmpPro1 = GRRLIB_LoadTexture(football2_pro1_png);
-	bmpPro2 = GRRLIB_LoadTexture(football2_pro2_png);
 	
 	for (y = 0; y < FOOTBALL2_BLIP_ROWS; y++){
 		for (x = 0; x < FOOTBALL2_BLIP_COLUMNS; x++){
@@ -128,65 +118,69 @@ void Football2_Init()
 	}
 	
 	PlatformSetInput(0);
-	// turn on the game
+	// turn off the game
 	Football2_SetSkill(0);
-	Football2_PowerOn();
+	Football2_PowerOff();
 
 	bInited = TRUE;
 
 }
 
-void Football2_DeInit()
+void Football2_StopSound()
 {
 	// stop all sounds...
 	Platform_StopSound();
+}
+
+void Football2_DeInit()
+{
+	// stop all sounds...
+	Football2_StopSound();
+	Football2_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
-	GRRLIB_FreeTexture(bmpPowerOff);
-	GRRLIB_FreeTexture(bmpPro1);
-	GRRLIB_FreeTexture(bmpPro2);
 	bInited = FALSE;
 }
 
 void Football2_Paint()
 {
-	int x, y;
+	int x, y, extra;
 	BOOL power = Football2_GetPower();
-	BOOL skill = Football2_GetSkill();
+	int skill = Football2_GetSkill();
 	int p_switch;
-	p_switch = Platform_GetPowerSwitch(ONOFF_OFF12);
+	p_switch = Platform_GetPowerSwitchPlus(ONOFF_OFF12, &extra);
 	if(power) {
 		if(p_switch == -1) {
-			if(skill == 0)
+			if(skill%2 == 0)
 				Football2_PowerOff();
-			if(skill == 1) {
+			if(skill%2 == 1) {
 				Football2_PowerOn();
-				Football2_SetSkill(0);
+				Football2_SetSkill((extra == 0) ? LVL_ROOKIESLOW : LVL_PROSLOW);
 			}		
 		} 
 		if(p_switch == 1) {
-			if(skill == 0) {
+			if(skill%2 == 0) {
 				Football2_PowerOn();
-				Football2_SetSkill(1);
+				Football2_SetSkill((extra == 0) ? LVL_ROOKIEFAST : LVL_PROFAST);
 			}
 		} 
 	}
 	else {
 		if(p_switch == 1) {
 			Football2_PowerOn();
-			Football2_SetSkill(0);
+			Football2_SetSkill((extra == 0) ? LVL_ROOKIESLOW : LVL_PROSLOW);
 		} 
 	}
 //	if (gMainWndP == NULL){ return; }
 
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 	// visualize the control states
 	if (power){
 		if (skill == 0){
-			GRRLIB_DrawImg(realx(football2_pro_1_x), realy(football2_pro_1_y), bmpPro1, 0, 1, 1, 0xFFFFFFFF);
+			draw_switch(SWITCH_TYPE_1, football2_pro_1_x, football2_pro_1_y, SWITCH_POS_PRO1);
 		} else {
-			GRRLIB_DrawImg(realx(football2_pro_2_x), realy(football2_pro_2_y), bmpPro2, 0, 1, 1, 0xFFFFFFFF);
+			draw_switch(SWITCH_TYPE_1, football2_pro_1_x, football2_pro_1_y, SWITCH_POS_PRO2);
 		}
 
 		for (y = 0; y < FOOTBALL2_BLIP_ROWS; y++){
@@ -200,7 +194,7 @@ void Football2_Paint()
 		}	
 	} 
 	else {
-		GRRLIB_DrawImg(realx(football2_power_off_x), realy(football2_power_off_y), bmpPowerOff, 0, 1, 1, 0xFFFFFFFF);
+		draw_switch(SWITCH_TYPE_1, football2_pro_1_x, football2_pro_1_y, SWITCH_POS_OFF);
 	}
 	
 }
@@ -227,12 +221,6 @@ void Football2_ClearScreen()
 void Football2_PlaySound(int nSound, unsigned int nFlags)
 {
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
-}
-
-void Football2_StopSound()
-{
-	// stop all sounds...
-	Platform_StopSound();
 }
 
 //----------------------------------------------------------------------------
@@ -419,7 +407,7 @@ void Football2_DrawYard(int nYard)
 
 	if (sign == 1){
 		// draw direction on left
-		digit[idx].val = 1;
+		digit[idx].val = 0;
 		digit[idx].type = DIGIT_TYPE_SPECIAL;
 		idx++;
 	}
@@ -435,7 +423,7 @@ void Football2_DrawYard(int nYard)
 
 	if (sign == -1){
 		// draw direction on right
-		digit[idx].val = 0;
+		digit[idx].val = 1;
 		digit[idx].type = DIGIT_TYPE_SPECIAL;
 	}
 }

@@ -131,7 +131,6 @@ static PLAYER defense[NUM_DEFENSEPLAYERS];
 	p.nColumn++; \
 }
 
-static BOOL ISBALL(int x, int y);
 static BOOL ISBALL(int x, int y)
 {
 	if ((ball.nColumn == x)
@@ -142,7 +141,6 @@ static BOOL ISBALL(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISPLAYER(int x, int y);
 static BOOL ISPLAYER(int x, int y)
 {
 	if ((player.nColumn == x)
@@ -153,7 +151,6 @@ static BOOL ISPLAYER(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISDEFENSE(int x, int y);
 static BOOL ISDEFENSE(int x, int y)
 {
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
@@ -166,7 +163,6 @@ static BOOL ISDEFENSE(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISOCCUPIED(int x, int y);
 static BOOL ISOCCUPIED(int x, int y)
 {
 	if (ISPLAYER(x,y)){
@@ -178,7 +174,6 @@ static BOOL ISOCCUPIED(int x, int y)
 	return FALSE;
 }
 
-static int GETPLAYERAT(int x, int y);
 static int GETPLAYERAT(int x, int y){
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
 		if ((defense[i].nColumn == x)
@@ -204,8 +199,6 @@ static int GETPLAYERAT(int x, int y){
 
 #define ISPLAYERENABLED(p) \
 	(p.nBright)
-
-
 
 // finite state machine stuff
 
@@ -234,43 +227,7 @@ static FSMFCN fsmfcn[] = {
 	fsmGameOver
 };
 
-
-// proto's
-static void InitGame();
-static void DrawBlips();
-static void EraseBlips();
-
-
-BOOL Basketball_GetPower()
-{
-	return (bPower ? TRUE : FALSE);
-}
-
-void Basketball_PowerOn()
-{
-	InitGame();
-	bPower = TRUE;
-}
-
-void Basketball_PowerOff()
-{
-	bPower = FALSE;
-	Basketball_StopSound();
-}
-
-void Basketball_SetSkill(int i){
-	if (i == 0){
-		bPro2 = FALSE;
-	} else {
-		bPro2 = TRUE;
-	}
-}
-
-int Basketball_GetSkill(){
-	return bPro2 ? 1 : 0;
-}
-
-void InitGame()
+static void InitGame()
 {
 	bHomeTeam = FALSE;
 	PlatformSetInput(bHomeTeam);
@@ -285,40 +242,7 @@ void InitGame()
 	fsm = FSM_PLAYSTARTWAIT;
 }
 
-void Basketball_Run(int tu)
-{
-	int x, y;
-
-	// prevent reentrancy
-	if (bInFrame){ return; }
-	bInFrame = TRUE;
-
-	// init the blips field
-	for (y = 0; y < BASKETBALL_BLIP_ROWS; y++){
-		for (x = 0; x < BASKETBALL_BLIP_COLUMNS; x++){
-			Blips[x][y] = BLIP_OFF;
-		}
-	}
-
-	if (!bPower){
-		Basketball_ClearScreen();
-		bInFrame = FALSE;
-		return;
-	}
-
-	Platform_StartDraw();
-
-	(fsmfcn[fsm])();
-
-	DrawBlips();
-
-	Platform_EndDraw();
-
-	bInFrame = FALSE;
-
-}
-
-void DrawBlips()
+static void DrawBlips()
 {
 	int x, y, nBright;
 	static BOOL bBlink = FALSE;
@@ -377,15 +301,68 @@ void DrawBlips()
 	bBlink = !bBlink;
 }
 
-void EraseBlips()
+BOOL Basketball_GetPower()
 {
-	// erase the blips field
-	for (int y = 0; y < BASKETBALL_BLIP_ROWS; y++){
-		for (int x = 0; x < BASKETBALL_BLIP_COLUMNS; x++){
-			Basketball_DrawBlip(BLIP_OFF, x, y);
-		}
+	return (bPower ? TRUE : FALSE);
+}
+
+void Basketball_PowerOn()
+{
+	InitGame();
+	bPower = TRUE;
+}
+
+void Basketball_PowerOff()
+{
+	bPower = FALSE;
+	Basketball_StopSound();
+}
+
+void Basketball_SetSkill(int i){
+	if (i == 0){
+		bPro2 = FALSE;
+	} else {
+		bPro2 = TRUE;
 	}
 }
+
+int Basketball_GetSkill(){
+	return bPro2 ? 1 : 0;
+}
+
+void Basketball_Run(int tu)
+{
+	int x, y;
+
+	// prevent reentrancy
+	if (bInFrame){ return; }
+	bInFrame = TRUE;
+
+	// init the blips field
+	for (y = 0; y < BASKETBALL_BLIP_ROWS; y++){
+		for (x = 0; x < BASKETBALL_BLIP_COLUMNS; x++){
+			Blips[x][y] = BLIP_OFF;
+		}
+	}
+
+	if (!bPower){
+		Basketball_ClearScreen();
+		bInFrame = FALSE;
+		return;
+	}
+
+	Platform_StartDraw();
+
+	(fsmfcn[fsm])();
+
+	DrawBlips();
+
+	Platform_EndDraw();
+
+	bInFrame = FALSE;
+
+}
+
 
 // FINITE STATE MACHINE STUFF
 

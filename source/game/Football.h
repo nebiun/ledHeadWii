@@ -44,12 +44,13 @@ Website : http://www.peterhirschberg.com
 #define FOOTBALL_BLIP_ROWS			3
 #define FOOTBALL_BLIP_COLUMNS		9
 
-#define FOOTBALL_SOUND_TICK			0
-#define FOOTBALL_SOUND_ENDPLAY		1
+#define FOOTBALL_SOUND_TICK				0
+#define FOOTBALL_SOUND_ENDPLAY			1
 #define FOOTBALL_SOUND_ENDPOSSESSION	2
 #define FOOTBALL_SOUND_SCORE			3
+#define FOOTBALL_SOUND_NSOUDS			4
 
-void Football_Run();
+void Football_Run(int tu);
 void Football_SetSkill(int i);
 int Football_GetSkill();
 void Football_PowerOn();

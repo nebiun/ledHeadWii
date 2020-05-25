@@ -2,6 +2,10 @@
  * LEDhead for Wii
  * Copyright (C) 2017-2020 Nebiun
  *
+ * Based on the handheld electronic games by Mattel Electronics.
+ * All trademarks copyrighted by their respective owners. This
+ * program is not affiliated or endorsed by Mattel Electronics.
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -15,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
- 
+
 #include "LED_Handled.h"
 #include "digits_f_png.h"
 
@@ -48,13 +52,13 @@ int draw_digit_f(int x, int y, int val, int flag)
 			idx = 12 + val%10;
 		break;
 	case DIGIT_TYPE_SPECIAL:
-		idx = 23 + val%2;
+		idx = 22 + val%4;
 		break;
 	}
 	if(idx < 0)
 		return -1;
 	
-	GRRLIB_DrawTile(realx(x), realy(y), digit, 0, 1, 1, 0xFFFFFFFF, idx);
+	GRRLIB_DrawTile(realx(x), realy(y), digit, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF, idx);
 	return 0;
 }
 

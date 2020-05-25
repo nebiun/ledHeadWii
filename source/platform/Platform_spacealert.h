@@ -51,14 +51,29 @@ Website : http://www.peterhirschberg.com
 #define spacealert_slider_y 271
 #define spacealert_power_x 87
 #define spacealert_power_y 231
-#define spacealert_kfire_x 73
-#define spacealert_kfire_y 148
+
+// [general]
+#define missileattack_digit_spacing 12
+#define missileattack_digit_x 172
+#define missileattack_digit_y 65
+#define missileattack_digit_w 13
+#define missileattack_digit_h 14
+#define missileattack_blip_xspacing 1300
+#define missileattack_blip_yspacing 1700
+#define missileattack_blip_x 166
+#define missileattack_blip_y 95
+#define missileattack_slider_x 151
+#define missileattack_slider_y 292
+#define missileattack_power_x 78
+#define missileattack_power_y 188
 
 // interface that the platform must provide for this game
 
 // functions exported to the game context
 void SpaceAlert_Init();
+void MissileAttack_Init();
 void SpaceAlert_Help();
+void MissileAttack_Help();
 void SpaceAlert_DeInit();
 void SpaceAlert_Paint();
 void SpaceAlert_ClearScreen();

@@ -40,7 +40,6 @@ Website : http://www.peterhirschberg.com
 #include "Platform.h"
 #include "Platform_Soccer.h"
 
-
 #define SOCCER_BLIP_ROWS			4
 #define SOCCER_BLIP_COLUMNS			5
 
@@ -50,8 +49,9 @@ Website : http://www.peterhirschberg.com
 #define SOCCER_SOUND_ENDPLAY		3
 #define SOCCER_SOUND_ENDQUARTER		4
 #define SOCCER_SOUND_ENDGAME		5
+#define SOCCER_SOUND_NSOUNDS		6
 
-void Soccer_Run();
+void Soccer_Run(int tu);
 void Soccer_SetSkill(int i);
 int Soccer_GetSkill();
 void Soccer_PowerOn();

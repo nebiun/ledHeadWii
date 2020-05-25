@@ -49,12 +49,13 @@ Website : http://www.peterhirschberg.com
 #define SPACEALERT_SOUND_LOSE		2
 #define SPACEALERT_SOUND_WIN		3
 #define SPACEALERT_SOUND_RAIDER		4
+#define SPACEALERT_SOUND_NSOUNDS	5
 
-void SpaceAlert_Run();
+void SpaceAlert_Run(int tu);
 void SpaceAlert_PowerOn();
 void SpaceAlert_PowerOff();
 BOOL SpaceAlert_GetPower();
-
+void SpaceAlert_Debug(int f);
 
 #endif
 

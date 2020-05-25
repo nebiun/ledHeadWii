@@ -62,7 +62,7 @@ static GRRLIB_texImg *bmpPowerOn;
 static BOOL bMineSound = FALSE;
 static BOOL bMineSoundPlaying = FALSE;
 
-static Sound_t tcWaveRes[7];
+static Sound_t tcWaveRes[ARMORBATTLE_SOUND_NSOUNDS];
 static Blip_t blip[ARMORBATTLE_BLIP_COLUMNS][ARMORBATTLE_BLIP_ROWS];
 static Stat_t digit[2];
 static Help_t help[] = {
@@ -85,13 +85,13 @@ void ArmorBattle_Init()
 	int x, y;
 
 	// Init sounds
-	Sound_set(&tcWaveRes[0], armorbattle_tick_raw, armorbattle_tick_raw_size, 17 );
-	Sound_set(&tcWaveRes[1], armorbattle_near_raw, armorbattle_near_raw_size, 165 );
-	Sound_set(&tcWaveRes[2], armorbattle_enemy_raw, armorbattle_enemy_raw_size, 124 );
-	Sound_set(&tcWaveRes[3], armorbattle_fire_raw, armorbattle_fire_raw_size, 660 );
-	Sound_set(&tcWaveRes[4], armorbattle_hit_raw, armorbattle_hit_raw_size, 524 );
-	Sound_set(&tcWaveRes[5], armorbattle_score_raw, armorbattle_score_raw_size, 1542 );
-	Sound_set(&tcWaveRes[6], armorbattle_endgame_raw, armorbattle_endgame_raw_size, 5244 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_TICK], armorbattle_tick_raw, armorbattle_tick_raw_size, 17 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_NEAR], armorbattle_near_raw, armorbattle_near_raw_size, 165 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_ENEMY], armorbattle_enemy_raw, armorbattle_enemy_raw_size, 124 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_FIRE], armorbattle_fire_raw, armorbattle_fire_raw_size, 660 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_HIT], armorbattle_hit_raw, armorbattle_hit_raw_size, 524 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_SCORE], armorbattle_score_raw, armorbattle_score_raw_size, 1542 );
+	Sound_set(&tcWaveRes[ARMORBATTLE_SOUND_ENDGAME], armorbattle_endgame_raw, armorbattle_endgame_raw_size, 5244 );
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(armorbattle_screen_png);
@@ -129,12 +129,20 @@ void ArmorBattle_Init()
 	}
 }
 
+void ArmorBattle_StopSound()
+{
+	bMineSoundPlaying = FALSE;
+	bMineSound = FALSE;
+
+	// stop all sounds...
+	Platform_StopSound();
+}
+
 void ArmorBattle_DeInit()
 {
 	// stop all sounds...
-	Platform_StopSound();
-	bMineSoundPlaying = FALSE;
-	
+	ArmorBattle_StopSound();
+	ArmorBattle_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
 	GRRLIB_FreeTexture(bmpBlipDim);
 	GRRLIB_FreeTexture(bmpBlipBright);
@@ -159,12 +167,12 @@ void ArmorBattle_Paint()
 		ArmorBattle_PowerOn();
 	}
 	
-	GRRLIB_DrawImg (realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg (realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 	// visualize the control states
 	if (power)
 	{
-		GRRLIB_DrawImg(realx(armorbattle_power_x), realy(armorbattle_power_y), bmpPowerOn, 0, 1, 1, 0xFFFFFFFF);
+		GRRLIB_DrawImg(realx(armorbattle_power_x), realy(armorbattle_power_y), bmpPowerOn, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 		
 		// show blips 
 		for (y = 0; y < ARMORBATTLE_BLIP_ROWS; y++){
@@ -174,10 +182,10 @@ void ArmorBattle_Paint()
 				case BLIP_OFF:
 					break;
 				case BLIP_DIM:
-					GRRLIB_DrawImg (realx(pblip->x), realy(pblip->y), bmpBlipDim, 0, 1, 1, 0xFFFFFFFF);
+					GRRLIB_DrawImg (realx(pblip->x), realy(pblip->y), bmpBlipDim, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 					break;
 				case BLIP_BRIGHT:
-					GRRLIB_DrawImg (realx(pblip->x), realy(pblip->y), bmpBlipBright, 0, 1, 1, 0xFFFFFFFF);
+					GRRLIB_DrawImg (realx(pblip->x), realy(pblip->y), bmpBlipBright, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 					break;
 				}
 			}
@@ -186,9 +194,9 @@ void ArmorBattle_Paint()
 		// Show time
 		for(x = 0; x < sizeof(digit)/sizeof(*digit); x++) {
 			if(digit[x].val == -1)
-				GRRLIB_DrawTile(realx(digit[x].x), realy(digit[x].y), bmpDigits, 0, 1, 1, 0xFFFFFFFF, 0);	
+				GRRLIB_DrawTile(realx(digit[x].x), realy(digit[x].y), bmpDigits, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF, 0);	
 			else
-				GRRLIB_DrawTile(realx(digit[x].x), realy(digit[x].y), bmpDigits, 0, 1, 1, 0xFFFFFFFF, digit[x].val);
+				GRRLIB_DrawTile(realx(digit[x].x), realy(digit[x].y), bmpDigits, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF, digit[x].val);
 		}
 	}
 	else
@@ -236,16 +244,6 @@ void ArmorBattle_PlaySound(int nSound, unsigned int nFlags)
 
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void ArmorBattle_StopSound()
-{
-	bMineSoundPlaying = FALSE;
-	bMineSound = FALSE;
-
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's

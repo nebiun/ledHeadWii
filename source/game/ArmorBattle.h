@@ -50,8 +50,9 @@ Website : http://www.peterhirschberg.com
 #define ARMORBATTLE_SOUND_HIT			4
 #define ARMORBATTLE_SOUND_SCORE			5
 #define ARMORBATTLE_SOUND_ENDGAME		6
+#define ARMORBATTLE_SOUND_NSOUNDS		7
 
-void ArmorBattle_Run();
+void ArmorBattle_Run(int tu);
 void ArmorBattle_SetSkill(int i);
 int ArmorBattle_GetSkill();
 void ArmorBattle_PowerOn();

@@ -138,18 +138,6 @@ static PLAYER defense[NUM_DEFENSEPLAYERS];
 	p.nColumn++; \
 }
 
-static BOOL ISPUCK(int x, int y);
-static BOOL ISPUCK(int x, int y)
-{
-	if ((puck.nColumn == x)
-		&& (puck.nRow == y)
-		&& (puck.nBright)){
-		return TRUE;
-	}
-	return FALSE;
-}
-
-static BOOL ISPLAYER(int x, int y);
 static BOOL ISPLAYER(int x, int y)
 {
 	if ((player.nColumn == x)
@@ -160,7 +148,6 @@ static BOOL ISPLAYER(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISDEFENSE(int x, int y);
 static BOOL ISDEFENSE(int x, int y)
 {
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
@@ -173,7 +160,6 @@ static BOOL ISDEFENSE(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISOCCUPIED(int x, int y);
 static BOOL ISOCCUPIED(int x, int y)
 {
 	// easy way to keep player and defenders out of the non-playfield areas
@@ -197,8 +183,8 @@ static BOOL ISOCCUPIED(int x, int y)
 	return FALSE;
 }
 
-static int GETPLAYERAT(int x, int y);
-static int GETPLAYERAT(int x, int y){
+static int GETPLAYERAT(int x, int y)
+{
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
 		if ((defense[i].nColumn == x)
 			&& (defense[i].nRow == y)
@@ -233,7 +219,6 @@ static void fsmInPlay();
 static void fsmGoal();
 static void fsmGameOver();
 
-
 static enum FSM {
 	FSM_PLAYSTARTWAIT=0,
 	FSM_SHOWSTATS,
@@ -252,44 +237,7 @@ static FSMFCN fsmfcn[] = {
 	fsmGameOver
 };
 
-
-// proto's
-static void InitGame();
-static void DrawBlips();
-static void EraseBlips();
-static BOOL PenaltyTest(int x, int y);
-
-
-BOOL Hockey_GetPower()
-{
-	return (bPower ? TRUE : FALSE);
-}
-
-void Hockey_PowerOn()
-{
-	InitGame();
-	bPower = TRUE;
-}
-
-void Hockey_PowerOff()
-{
-	bPower = FALSE;
-	Hockey_StopSound();
-}
-
-void Hockey_SetSkill(int i){
-	if (i == 0){
-		bPro2 = FALSE;
-	} else {
-		bPro2 = TRUE;
-	}
-}
-
-int Hockey_GetSkill(){
-	return bPro2 ? 1 : 0;
-}
-
-void InitGame()
+static void InitGame()
 {
 	bHomeTeam = FALSE;
 	PlatformSetInput(bHomeTeam);
@@ -313,40 +261,7 @@ void InitGame()
 	fsmShowStats();
 }
 
-void Hockey_Run(int tu)
-{
-	int x, y;
-
-	// prevent reentrancy
-	if (bInFrame){ return; }
-	bInFrame = TRUE;
-
-	// init the blips field
-	for (y = 0; y < HOCKEY_BLIP_ROWS; y++){
-		for (x = 0; x < HOCKEY_BLIP_COLUMNS; x++){
-			Blips[x][y] = BLIP_OFF;
-		}
-	}
-
-	if (!bPower){
-		Hockey_ClearScreen();
-		bInFrame = FALSE;
-		return;
-	}
-
-	Platform_StartDraw();
-
-	(fsmfcn[fsm])();
-
-	DrawBlips();
-
-	Platform_EndDraw();
-
-	bInFrame = FALSE;
-
-}
-
-void DrawBlips()
+static void DrawBlips()
 {
 	int x, y, nBright;
 	static BOOL bBlink = FALSE;
@@ -416,20 +331,7 @@ void DrawBlips()
 	bBlink = !bBlink;
 }
 
-void EraseBlips()
-{
-	// erase the blips field
-	for (int y = 1; y < HOCKEY_BLIP_ROWS; y++){
-		for (int x = 0; x < HOCKEY_BLIP_COLUMNS; x++){
-			Hockey_DrawBlip(BLIP_OFF, x, y);
-		}
-	}
-
-	// erase the blip behind the goal
-	Hockey_DrawBlip(BLIP_OFF, 2, 0);
-}
-
-BOOL PenaltyTest(int x, int y)
+static BOOL PenaltyTest(int x, int y)
 {
 	if (ISDEFENSE(x, y))
 	{
@@ -464,6 +366,68 @@ BOOL PenaltyTest(int x, int y)
 	}
 
 	return FALSE;
+}
+
+BOOL Hockey_GetPower()
+{
+	return (bPower ? TRUE : FALSE);
+}
+
+void Hockey_PowerOn()
+{
+	InitGame();
+	bPower = TRUE;
+}
+
+void Hockey_PowerOff()
+{
+	bPower = FALSE;
+	Hockey_StopSound();
+}
+
+void Hockey_SetSkill(int i){
+	if (i == 0){
+		bPro2 = FALSE;
+	} else {
+		bPro2 = TRUE;
+	}
+}
+
+int Hockey_GetSkill(){
+	return bPro2 ? 1 : 0;
+}
+
+void Hockey_Run(int tu)
+{
+	int x, y;
+
+	// prevent reentrancy
+	if (bInFrame){ return; }
+	bInFrame = TRUE;
+
+	// init the blips field
+	for (y = 0; y < HOCKEY_BLIP_ROWS; y++){
+		for (x = 0; x < HOCKEY_BLIP_COLUMNS; x++){
+			Blips[x][y] = BLIP_OFF;
+		}
+	}
+
+	if (!bPower){
+		Hockey_ClearScreen();
+		bInFrame = FALSE;
+		return;
+	}
+
+	Platform_StartDraw();
+
+	(fsmfcn[fsm])();
+
+	DrawBlips();
+
+	Platform_EndDraw();
+
+	bInFrame = FALSE;
+
 }
 
 // FINITE STATE MACHINE STUFF

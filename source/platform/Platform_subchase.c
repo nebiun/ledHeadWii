@@ -56,7 +56,7 @@ static GRRLIB_texImg *bmpDigits;
 static GRRLIB_texImg *bmpPowerOff;
 static GRRLIB_texImg *bmpPowerOn;
 
-static Sound_t tcWaveRes[4];
+static Sound_t tcWaveRes[SUBCHASE_SOUND_NSOUNDS];
 static Blip_t blip[SUBCHASE_BLIP_COLUMNS][SUBCHASE_BLIP_ROWS];
 static Stat_t digit[2];
 static Help_t help[] = {
@@ -79,10 +79,10 @@ void SubChase_Init()
 	int x, y;
 
 	// Init sounds
-	Sound_set(&tcWaveRes[0], subchase_sonar_raw, subchase_sonar_raw_size, 119);
-	Sound_set(&tcWaveRes[1], subchase_charge_raw, subchase_charge_raw_size, 915);
-	Sound_set(&tcWaveRes[2], subchase_hit_raw, subchase_hit_raw_size, 1190);
-	Sound_set(&tcWaveRes[3], subchase_sink_raw, subchase_sink_raw_size, 1654);
+	Sound_set(&tcWaveRes[SUBCHASE_SOUND_SONAR], subchase_sonar_raw, subchase_sonar_raw_size, 119);
+	Sound_set(&tcWaveRes[SUBCHASE_SOUND_CHARGE], subchase_charge_raw, subchase_charge_raw_size, 915);
+	Sound_set(&tcWaveRes[SUBCHASE_SOUND_HIT], subchase_hit_raw, subchase_hit_raw_size, 1190);
+	Sound_set(&tcWaveRes[SUBCHASE_SOUND_SINK], subchase_sink_raw, subchase_sink_raw_size, 1654);
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(subchase_screen_png);
@@ -120,11 +120,17 @@ void SubChase_Init()
 	}
 }
 
-void SubChase_DeInit()
+void SubChase_StopSound()
 {
 	// stop all sounds...
 	Platform_StopSound();
-	
+}
+
+void SubChase_DeInit()
+{
+	// stop all sounds...
+	SubChase_StopSound();
+	SubChase_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
 	GRRLIB_FreeTexture(bmpBlipDim);
 	GRRLIB_FreeTexture(bmpBlipBright);
@@ -149,12 +155,12 @@ void SubChase_Paint()
 	}
 	
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 	// visualize the control states
 	if (power)
 	{
-		GRRLIB_DrawImg(realx(subchase_power_x), realy(subchase_power_y), bmpPowerOn, 0, 1, 1, 0xFFFFFFFF);
+		GRRLIB_DrawImg(realx(subchase_power_x), realy(subchase_power_y), bmpPowerOn, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 		for (y = 0; y < SUBCHASE_BLIP_ROWS; y++){
 			for (x = 0; x < SUBCHASE_BLIP_COLUMNS; x++){
@@ -162,10 +168,10 @@ void SubChase_Paint()
 				
 				switch(pblip->status) {
 				case BLIP_DIM:
-					GRRLIB_DrawImg(realx(pblip->x), realy(pblip->y), bmpBlipDim, 0, 1, 1, 0xFFFFFFFF);
+					GRRLIB_DrawImg(realx(pblip->x), realy(pblip->y), bmpBlipDim, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 					break;
 				case BLIP_BRIGHT:
-					GRRLIB_DrawImg(realx(pblip->x), realy(pblip->y), bmpBlipBright, 0, 1, 1, 0xFFFFFFFF);
+					GRRLIB_DrawImg(realx(pblip->x), realy(pblip->y), bmpBlipBright, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 					break;
 				case BLIP_OFF:
 				default:
@@ -175,12 +181,12 @@ void SubChase_Paint()
 		}	
 		
 		for(x = 0; x < 2; x++) {
-			GRRLIB_DrawTile(realx(digit[x].x), realy(digit[x].y), bmpDigits, 0, 1, 1, 0xFFFFFFFF, digit[x].val);
+			GRRLIB_DrawTile(realx(digit[x].x), realy(digit[x].y), bmpDigits, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF, digit[x].val);
 		}
 	}
 	else
 	{
-		GRRLIB_DrawImg(realx(subchase_power_x), realy(subchase_power_y), bmpPowerOff, 0, 1, 1, 0xFFFFFFFF);
+		GRRLIB_DrawImg(realx(subchase_power_x), realy(subchase_power_y), bmpPowerOff, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	}
 }
 
@@ -208,13 +214,6 @@ void SubChase_PlaySound(int nSound, unsigned int nFlags)
 
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void SubChase_StopSound()
-{
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's

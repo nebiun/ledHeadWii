@@ -45,7 +45,7 @@ Website : http://www.peterhirschberg.com
 // images
 static GRRLIB_texImg *bmpScreen;
 
-static Sound_t tcWaveRes[6];
+static Sound_t tcWaveRes[BASKETBALL_SOUND_NSOUNDS];
 static Blip_t blip[BASKETBALL_BLIP_COLUMNS][BASKETBALL_BLIP_ROWS];
 static Blip_t basket;
 static Stat_t digit[2];
@@ -68,15 +68,16 @@ void Basketball_Init()
 {
 	int x, y;
 	
-	if (bInited) return;
+	if (bInited) 
+		return;
 
 	// Init sounds
-	Sound_set(&tcWaveRes[0], basketball_tick_raw, basketball_tick_raw_size, 27);
-	Sound_set(&tcWaveRes[1], basketball_bounce_raw, basketball_bounce_raw_size, 50);
-	Sound_set(&tcWaveRes[2], basketball_score_raw, basketball_score_raw_size, 799);
-	Sound_set(&tcWaveRes[3], basketball_endplay_raw, basketball_endplay_raw_size, 721);
-	Sound_set(&tcWaveRes[4], basketball_endquarter_raw, basketball_endquarter_raw_size, 1878);
-	Sound_set(&tcWaveRes[5], basketball_endgame_raw, basketball_endgame_raw_size, 3753);
+	Sound_set(&tcWaveRes[BASKETBALL_SOUND_TICK], basketball_tick_raw, basketball_tick_raw_size, 27);
+	Sound_set(&tcWaveRes[BASKETBALL_SOUND_BOUNCE], basketball_bounce_raw, basketball_bounce_raw_size, 50);
+	Sound_set(&tcWaveRes[BASKETBALL_SOUND_SCORE], basketball_score_raw, basketball_score_raw_size, 799);
+	Sound_set(&tcWaveRes[BASKETBALL_SOUND_ENDPLAY], basketball_endplay_raw, basketball_endplay_raw_size, 721);
+	Sound_set(&tcWaveRes[BASKETBALL_SOUND_ENDQUARTER], basketball_endquarter_raw, basketball_endquarter_raw_size, 1878);
+	Sound_set(&tcWaveRes[BASKETBALL_SOUND_ENDGAME], basketball_endgame_raw, basketball_endgame_raw_size, 3753);
 	
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(basketball_screen_png);
@@ -109,10 +110,17 @@ void Basketball_Init()
 	bInited = TRUE;
 }
 
-void Basketball_DeInit()
+void Basketball_StopSound()
 {
 	// stop all sounds...
 	Platform_StopSound();
+}
+
+void Basketball_DeInit()
+{
+	// stop all sounds...
+	Basketball_StopSound();
+	Basketball_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
 	bInited = FALSE;
 }
@@ -144,14 +152,14 @@ void Basketball_Paint()
 	}
 	
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 
 	// visualize the control states
 	if (power){
 		if (skill == 0){
-			draw_poweroff_a(basketball_pro_1_x, basketball_pro_1_y, POWER_POS_MODE1);
+			draw_switch(SWITCH_TYPE_2,basketball_pro_1_x, basketball_pro_1_y, SWITCH_POS_MODE1);
 		} else {
-			draw_poweroff_a(basketball_pro_2_x, basketball_pro_2_y, POWER_POS_MODE2);
+			draw_switch(SWITCH_TYPE_2,basketball_pro_1_x, basketball_pro_1_y, SWITCH_POS_MODE2);
 		}
  
 		for (y = 0; y < BASKETBALL_BLIP_ROWS; y++){
@@ -168,7 +176,7 @@ void Basketball_Paint()
 			draw_digit(digit[x].x, digit[x].y, digit[x].val);
 	}
 	else {
-		draw_poweroff_a(basketball_power_off_x, basketball_power_off_y, POWER_POS_OFF);
+		draw_switch(SWITCH_TYPE_2,basketball_pro_1_x, basketball_pro_1_y, SWITCH_POS_OFF);
 	}
 }
 
@@ -195,13 +203,6 @@ void Basketball_PlaySound(int nSound, unsigned int nFlags)
 {
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void Basketball_StopSound()
-{
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's

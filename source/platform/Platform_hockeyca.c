@@ -45,7 +45,7 @@ Website : http://www.peterhirschberg.com
 // images
 static GRRLIB_texImg *bmpScreen;
 
-static Sound_t tcWaveRes[6];
+static Sound_t tcWaveRes[HOCKEYCA_SOUND_NSOUNDS];
 static Blip_t blip[HOCKEYCA_BLIP_COLUMNS][HOCKEYCA_BLIP_ROWS];
 static Blip_t goal;
 static Stat_t digit[2];
@@ -68,15 +68,16 @@ void HockeyCa_Init()
 {	
 	int x, y;
 	
-	if (bInited) return;
+	if (bInited) 
+		return;
 	
 	// Init sounds
-	Sound_set(&tcWaveRes[0], hockeyca_tick_raw, hockeyca_tick_raw_size, 13 );
-	Sound_set(&tcWaveRes[1], hockeyca_bounce_raw, hockeyca_bounce_raw_size, 33 );
-	Sound_set(&tcWaveRes[2], hockeyca_score_raw, hockeyca_score_raw_size, 3307 );
-	Sound_set(&tcWaveRes[3], hockeyca_endplay_raw, hockeyca_endplay_raw_size, 762 );
-	Sound_set(&tcWaveRes[4], hockeyca_endperiod_raw, hockeyca_endperiod_raw_size, 1654 );
-	Sound_set(&tcWaveRes[5], hockeyca_endgame_raw, hockeyca_endgame_raw_size, 2543 );
+	Sound_set(&tcWaveRes[HOCKEYCA_SOUND_TICK], hockeyca_tick_raw, hockeyca_tick_raw_size, 13 );
+	Sound_set(&tcWaveRes[HOCKEYCA_SOUND_BOUNCE], hockeyca_bounce_raw, hockeyca_bounce_raw_size, 33 );
+	Sound_set(&tcWaveRes[HOCKEYCA_SOUND_SCORE], hockeyca_score_raw, hockeyca_score_raw_size, 3307 );
+	Sound_set(&tcWaveRes[HOCKEYCA_SOUND_ENDPLAY], hockeyca_endplay_raw, hockeyca_endplay_raw_size, 762 );
+	Sound_set(&tcWaveRes[HOCKEYCA_SOUND_ENDQUARTER], hockeyca_endperiod_raw, hockeyca_endperiod_raw_size, 1654 );
+	Sound_set(&tcWaveRes[HOCKEYCA_SOUND_ENDGAME], hockeyca_endgame_raw, hockeyca_endgame_raw_size, 2543 );
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(hockeyca_screen_png);
@@ -108,10 +109,17 @@ void HockeyCa_Init()
 	bInited = TRUE;
 }
 
-void HockeyCa_DeInit()
+void HockeyCa_StopSound()
 {
 	// stop all sounds...
 	Platform_StopSound();
+}
+
+void HockeyCa_DeInit()
+{
+	// stop all sounds...
+	HockeyCa_StopSound();
+	HockeyCa_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
 	bInited = FALSE;
 }
@@ -142,14 +150,14 @@ void HockeyCa_Paint()
 		}
 	}	
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 	// visualize the control states
 	if (power){
 		if (skill == 0){
-			draw_poweroff_a(hockeyca_pro_1_x, hockeyca_pro_1_y, POWER_POS_MODE1);
+			draw_switch(SWITCH_TYPE_2,hockeyca_pro_1_x, hockeyca_pro_1_y, SWITCH_POS_MODE1);
 		} else {
-			draw_poweroff_a(hockeyca_pro_2_x, hockeyca_pro_2_y, POWER_POS_MODE2);
+			draw_switch(SWITCH_TYPE_2,hockeyca_pro_1_x, hockeyca_pro_1_y, SWITCH_POS_MODE2);
 		}
 		
 		for (y = 0; y < HOCKEYCA_BLIP_ROWS; y++){
@@ -166,7 +174,7 @@ void HockeyCa_Paint()
 			draw_digit(digit[x].x, digit[x].y, digit[x].val);	
 	} 
 	else {
-		draw_poweroff_a(hockeyca_power_off_x, hockeyca_power_off_y, POWER_POS_OFF);
+		draw_switch(SWITCH_TYPE_2,hockeyca_pro_1_x, hockeyca_pro_1_y, SWITCH_POS_OFF);
 	}
 }
 
@@ -190,13 +198,6 @@ void HockeyCa_PlaySound(int nSound, unsigned int nFlags)
 {
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void HockeyCa_StopSound()
-{
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's

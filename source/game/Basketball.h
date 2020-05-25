@@ -49,8 +49,9 @@ Website : http://www.peterhirschberg.com
 #define BASKETBALL_SOUND_ENDPLAY		3
 #define BASKETBALL_SOUND_ENDQUARTER		4
 #define BASKETBALL_SOUND_ENDGAME		5
+#define BASKETBALL_SOUND_NSOUNDS		6
 
-void Basketball_Run();
+void Basketball_Run(int tu);
 void Basketball_SetSkill(int i);
 int Basketball_GetSkill();
 void Basketball_PowerOn();

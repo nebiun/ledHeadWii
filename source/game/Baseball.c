@@ -28,10 +28,13 @@ You should have received a copy of the GNU General Public License
 along with this program (license.txt); if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-Email : peter@peterhirschberg.comWebsite : http://www.peterhirschberg.com
+Email : peter@peterhirschberg.com
+Website : http://www.peterhirschberg.com
 
 */
 
+#include <string.h>
+#include <sys/time.h>
 #include "Baseball.h"
 #include "Games.h"
 
@@ -41,12 +44,16 @@ Email : peter@peterhirschberg.comWebsite : http://www.peterhirschberg.com
 #define THIRDBASE	9
 #define HOMEPLATE	12
 
+#define MAGIC_NUMBER	64		// emperically derived magic number
+#define SPEED_BASE		(1 + (MAGIC_NUMBER/16)) 
+
+#define CENTER_FIELD	0
+#define LEFT_FIELD		1
+#define RIGHT_FIELD		2
 
 // game variables
 static BOOL bHomeTeam;
 static BOOL bInFrame = FALSE;
-static BOOL bPower;
-static BOOL bPro2 = FALSE;
 
 static int nHRuns;
 static int nVRuns;
@@ -59,7 +66,7 @@ static int nTimerPitchWait;
 
 static int nPitchSpeed;
 static BOOL bCurveball;
-static int nEraseIndex;
+static BOOL bStrike = FALSE;
 static int nPitchIndex;
 static int nPendingRuns;
 
@@ -68,13 +75,15 @@ static int nTimerEndPlayWait;
 static int nTimerRunnerMove;
 static int nRunnerSpeed;
 static int nTimerFielding;
-
 static int nCurrentRunnerIndex;
 
 static int nDefenseBlip;
+static int nBallBlip;
 
 static BOOL bCaught;
+static BOOL bDisplayOff;
 static int fireWorks;
+static int nSwingSlot;
 
 // finite state machine stuff
 
@@ -88,8 +97,9 @@ static void fsmOut(int tu);
 static void fsmHomeRun(int tu);
 static void fsmEndPossession(int tu);
 static void fsmGameOver(int tu);
+static void fsmGoOut(int tu);
 
-static enum FSM {
+enum FSM {
 	FSM_IDLE,
 	FSM_PITCHWAIT,
 	FSM_PITCHING,
@@ -99,8 +109,10 @@ static enum FSM {
 	FSM_OUT,
 	FSM_HOMERUN,
 	FSM_ENDPOSSESSION,
-	FSM_GAMEOVER
-}fsm;
+	FSM_GAMEOVER,
+	FSM_GOOUT
+};
+static enum FSM fsm;
 
 typedef void (*FSMFCN)(int);
 
@@ -114,66 +126,125 @@ static FSMFCN fsmfcn[] = {
 	fsmOut,
 	fsmHomeRun,
 	fsmEndPossession,
-	fsmGameOver
+	fsmGameOver,
+	fsmGoOut
 };
 
-typedef struct RUNNER
+typedef struct
 {
 	int baseindex;
 	BOOL enabled;
-}RUNNER;
+} RUNNER;
 
 #define MAX_RUNNERS		4
 RUNNER runners[MAX_RUNNERS];
 
+typedef struct {
+	int seq[3];
+	int n;
+} fireworks_t;
 
-// proto's
-static void InitGame();
-static void ClearAllDisplay();
-static void RestoreAllDisplay();
-static void InsertRunner();
-static BOOL MoveRunners();
-static void ResetOffBaseRunners();
-static void DrawDefenseBlip(int index);
-static void DrawBaseBlips(BOOL bState);
-static void ErasePitchBlips();
-static void HitBall(int nPosition);
-static void DoOut();
+static fireworks_t fw_frames[] = {
+	{ {DIAMOND(1)}, 1},
+	{ {DIAMOND(1), DIAMOND(2)}, 2},
+	{ {DIAMOND(1), DIAMOND(2), DEEP_1ST}, 3},
+	{ {DIAMOND(2), DEEP_1ST, DIAMOND(4)}, 3},
+	{ {DEEP_1ST, DIAMOND(4), DIAMOND(5)}, 3},
+	{ {DIAMOND(4), DIAMOND(5), DEEP_3RD}, 3},
+	{ {DIAMOND(5), DEEP_3RD, DIAMOND(8)}, 3},
+	{ {DEEP_3RD, DIAMOND(8), DIAMOND(7)}, 3},
+	{ {DIAMOND(8), DIAMOND(7), OUT_LEFT}, 3},
+	{ {DIAMOND(7), OUT_LEFT, OUT_CENTER}, 3},
+	{ {OUT_LEFT, OUT_CENTER, -1}, 3},
+	{ {OUT_CENTER, -1, DIAMOND(10)}, 3},
+	{ {-1, DIAMOND(10), DIAMOND(11)}, 3},
+	{ {DIAMOND(10), DIAMOND(11), NORMAL_BALL(8)}, 3},
+	{ {NORMAL_BALL(8), NORMAL_BALL(7)}, 2},
+	{ {NORMAL_BALL(8), NORMAL_BALL(7), NORMAL_BALL(6)}, 3},
+	{ {NORMAL_BALL(7), NORMAL_BALL(6), NORMAL_BALL(5)}, 3},
+	{ {NORMAL_BALL(6), NORMAL_BALL(5), CURVE_BALL(4)}, 3},
+	{ {NORMAL_BALL(5), CURVE_BALL(3), CURVE_BALL(2)}, 3},
+	{ {CURVE_BALL(3), CURVE_BALL(2), CURVE_BALL(1)}, 3},
+	{ {CURVE_BALL(2), CURVE_BALL(1), NORMAL_BALL(1)}, 3},
+	{ {CURVE_BALL(1), NORMAL_BALL(1), NORMAL_BALL(2)}, 3},
+	{ {NORMAL_BALL(1), NORMAL_BALL(2), NORMAL_BALL(3)}, 3},
+	{ {NORMAL_BALL(2), NORMAL_BALL(3), NORMAL_BALL(4)}, 3},
+	{ {NORMAL_BALL(3), NORMAL_BALL(4)}, 2},
+	{ {}, 0}
+};
 
-BOOL Baseball_GetPower()
+static void ClearBlips()
 {
-	return (bPower ? TRUE : FALSE);
-}
-
-void Baseball_PowerOn()
-{
-	InitGame();
-	bPower = TRUE;
-}
-
-void Baseball_PowerOff()
-{
-	bPower = FALSE;
-	Baseball_StopSound();
-}
-
-void Baseball_SetSkill(int i)
-{
-	if (i == 0)
-	{
-		bPro2 = FALSE;
-	} 
+	int i;
+	
+	if(fireWorks) {
+		fireworks_t *fw=&fw_frames[fireWorks-1];
+		
+		for(i=0; i<fw->n; i++) {
+			if(fw->seq[i] != -1)
+				Baseball_DrawBlip(FALSE,fw->seq[i]);
+		}
+	}
 	else {
-		bPro2 = TRUE;
+		if(nBallBlip != -1) {
+			Baseball_DrawBlip(FALSE, nBallBlip);
+		}
+		for (i=0; i<MAX_RUNNERS; i++) {
+			if (runners[i].enabled) {
+				Baseball_DrawBlip(FALSE, DIAMOND(runners[i].baseindex));
+			}
+		}
+		if (nDefenseBlip != -1) {
+			Baseball_DrawBlip(FALSE, nDefenseBlip);
+		}
 	}
 }
 
-int Baseball_GetSkill()
+static void DrawBlips()
 {
-	return bPro2 ? 1 : 0;
+	int i;
+	
+	if(fireWorks > 0) {
+		fireworks_t *fw=&fw_frames[fireWorks-1];
+
+		Baseball_DrawScore(-1, -1);	// Clean fireworks
+		for(i=0; i<fw->n; i++) {
+			if(fw->seq[i] == -1)
+				Baseball_DrawFireWorks();
+			else
+				Baseball_DrawBlip(TRUE,fw->seq[i]);
+		}
+	}
+	else {
+		if(nBallBlip != -1) {
+			Baseball_DrawBlip(TRUE, nBallBlip);
+		}
+		for (i=0; i<MAX_RUNNERS; i++) {
+			if (runners[i].enabled) {
+				Baseball_DrawBlip(TRUE, DIAMOND(runners[i].baseindex));
+			}
+		}
+		if (nDefenseBlip != -1) {
+			if (bCaught) {
+				static BOOL blink=FALSE;
+				static int blinkcnt=0;
+	
+				--blinkcnt;
+				if (blinkcnt<0) {
+					blinkcnt = 2;
+					blink = !blink;
+				}
+				if (blink) {
+					Baseball_DrawBlip(TRUE, nDefenseBlip);
+				}
+			}
+			else 
+				Baseball_DrawBlip(TRUE, nDefenseBlip);
+		}
+	}
 }
 
-void InitGame()
+static void InitGame()
 {
 	bHomeTeam = FALSE;
 	PlatformSetInput(bHomeTeam);
@@ -184,9 +255,9 @@ void InitGame()
 	nStrikes = 0;
 	nOuts = 0;
 	nBalls = 0;
-
-	for (int i=0; i<MAX_RUNNERS; i++)
-	{
+	nBallBlip = -1;
+	nDefenseBlip = -1;
+	for (int i=0; i<MAX_RUNNERS; i++) {
 		runners[i].enabled = FALSE;
 	}
 
@@ -196,11 +267,13 @@ void InitGame()
 void Baseball_Run(int tu)
 {
 	// prevent reentrancy
-	if (bInFrame){ return; }
+	if (bInFrame)
+		return;
+	
 	bInFrame = TRUE;
 
-	if (!bPower)
-	{
+	if (Baseball_GetPower() == FALSE) {
+		InitGame();
 		// power is off
 		Platform_StartDraw();
 		Baseball_DrawScore(-1, -1);
@@ -210,86 +283,31 @@ void Baseball_Run(int tu)
 	}
 
 	Platform_StartDraw();
-
+	
+	ClearBlips();
+	
 	// run the game
 	(fsmfcn[fsm])(tu);
 
+	if(!bDisplayOff) {
+		DrawBlips();
+	}
+	else {
+		Baseball_DrawScore(-1, -1);
+	}
+	
 	Platform_EndDraw();
 
 	bInFrame = FALSE;
 
 }
 
-static void ErasePitchBlips()
-{
-	for (int i=0; i<=8; i++)
-	{
-		// erase both possible sets of pitch blips
-		Baseball_DrawPitchBlip(FALSE, i, FALSE);
-		Baseball_DrawPitchBlip(FALSE, i, TRUE);
-	}
-}
-
-static void ClearAllDisplay()
-{
-	Baseball_DrawScore(-1, -1);
-	ErasePitchBlips();
-	DrawBaseBlips(FALSE);
-	DrawDefenseBlip(-1);
-}
-
-static void RestoreAllDisplay()
-{
-	Baseball_DrawStats(nInnings+1, nOuts, nBalls, nStrikes, bHomeTeam);
-	if (nEraseIndex > 0)
-	{
-		Baseball_DrawPitchBlip(TRUE, nEraseIndex, bCurveball);
-	}
-	DrawBaseBlips(TRUE);
-	if (nDefenseBlip != -1)
-	{
-		DrawDefenseBlip(nDefenseBlip);
-	}
-}
-
-static void DrawDefenseBlip(int index)
-{
-	Baseball_DrawDeepBlip((index == 0) ? TRUE:FALSE, 0);
-	Baseball_DrawOutfieldBlip((index == 1) ? TRUE:FALSE, 0);
-	Baseball_DrawOutfieldBlip((index == 2) ? TRUE:FALSE, 1);
-	Baseball_DrawOutfieldBlip((index == 3) ? TRUE:FALSE, 2);
-	Baseball_DrawDeepBlip((index == 4) ? TRUE:FALSE, 1);
-}
-
-static void DrawBaseBlips(BOOL bState)
-{
-	if (bState)
-	{
-		for (int i=0; i<MAX_RUNNERS; i++)
-		{
-			if (runners[i].enabled)
-			{
-				Baseball_DrawBaseBlip(TRUE, runners[i].baseindex);
-			}
-		}
-	}
-	else
-	{
-		for (int i=0; i<=HOMEPLATE; i++)
-		{
-			Baseball_DrawBaseBlip(FALSE, i);
-		}
-	}
-}
-
 static void InsertRunner()
 {
-	for (int i=0; i<MAX_RUNNERS; i++)
-	{
-		if (!runners[i].enabled)
-		{
-			runners[i].baseindex=0;
-			runners[i].enabled=TRUE;
+	for (int i=0; i<MAX_RUNNERS; i++) {
+		if (!runners[i].enabled) {
+			runners[i].baseindex = 0;
+			runners[i].enabled = TRUE;
 			nCurrentRunnerIndex = i;
 			return;
 		}
@@ -301,23 +319,14 @@ static BOOL MoveRunners()
 {
 	BOOL bRun = FALSE;
 
-	for (int i=0; i<MAX_RUNNERS; i++)
-	{
-		if (runners[i].enabled)
-		{
-			if ((runners[i].baseindex >= 0) && (runners[i].baseindex < HOMEPLATE))
-			{
-				// erase previous blip position
-				Baseball_DrawBaseBlip(FALSE, runners[i].baseindex);
-			}
+	for (int i=0; i<MAX_RUNNERS; i++) {
+		if (runners[i].enabled) {
 			runners[i].baseindex++;
-			if (runners[i].baseindex >= HOMEPLATE)
-			{
+			if (runners[i].baseindex >= HOMEPLATE) {
 				// got a run
-				runners[i].baseindex=-1;
-				runners[i].enabled=FALSE;
-				if (i == nCurrentRunnerIndex)
-				{
+				runners[i].baseindex = -1;
+				runners[i].enabled = FALSE;
+				if (i == nCurrentRunnerIndex) {
 					nCurrentRunnerIndex = -1;
 				}
 				bRun=TRUE;
@@ -331,23 +340,19 @@ static BOOL MoveRunners()
 static void ResetOffBaseRunners()
 {
 	BOOL bOffBase = FALSE;
-	for (int i=0; i<MAX_RUNNERS; i++)
-	{
-		if (runners[i].enabled)
-		{
+	for (int i=0; i<MAX_RUNNERS; i++) {
+		if (runners[i].enabled) {
 			if ((runners[i].baseindex != FIRSTBASE)
 				&& (runners[i].baseindex != SECONDBASE)
 				&& (runners[i].baseindex != THIRDBASE)
-				&& (runners[i].baseindex != HOMEPLATE))
-			{
+				&& (runners[i].baseindex != HOMEPLATE)) {
 				// yes, there is at least one runner and he is off-base
 				bOffBase = TRUE;
 				break;
 			}
 		}
 	}
-	if (bOffBase)
-	{
+	if (bOffBase) {
 		//
 		// The ball has now been fielded and there are
 		// currently runners off-base -- figure out who
@@ -363,12 +368,9 @@ static void ResetOffBaseRunners()
 		// see if the batter made it to first
 		BOOL bFirst=TRUE;
 		int i;
-		for (i=0; i<MAX_RUNNERS; i++)
-		{
-			if (runners[i].enabled)
-			{
-				if (runners[i].baseindex < FIRSTBASE)
-				{
+		for (i=0; i<MAX_RUNNERS; i++) {
+			if (runners[i].enabled) {
+				if (runners[i].baseindex < FIRSTBASE) {
 					// the batter didn't make it to first - he's out
 					runners[i].enabled = FALSE;
 					bFirst = FALSE;
@@ -376,72 +378,54 @@ static void ResetOffBaseRunners()
 				}
 			}
 		}
-		if (bFirst)
-		{
+		if (bFirst) {
 			// look for the lead runner
 			int nRunnerOut = -1;
-			for (i=0; i<MAX_RUNNERS; i++)
-			{
-				if (runners[i].enabled)
-				{
-					if (nRunnerOut == -1)
-					{
+			for (i=0; i<MAX_RUNNERS; i++) {
+				if (runners[i].enabled) {
+					if (nRunnerOut == -1) {
 						nRunnerOut = i;
 					}
-					else
-					{
-						if (runners[i].baseindex > runners[nRunnerOut].baseindex)
-						{
+					else {
+						if (runners[i].baseindex > runners[nRunnerOut].baseindex) {
 							nRunnerOut = i;
 						}
 					}
 				}
 			}
 			// mark the lead runner out
-			if (nRunnerOut != -1)
-			{
+			if (nRunnerOut != -1) {
 				runners[nRunnerOut].enabled = FALSE;
 			}
 
 			// figure out if the remaining runners should go to the previous or next base
-			for (i=0; i<MAX_RUNNERS; i++)
-			{
-				if (runners[i].enabled)
-				{
+			for (i=0; i<MAX_RUNNERS; i++) {
+				if (runners[i].enabled) {
 					int howfar = (runners[i].baseindex) % 3;
-					if (howfar <= 1)
-					{
+					if (howfar <= 1) {
 						// go back
 						runners[i].baseindex--;
 					}
-					else
-					{
+					else {
 						// go forward
 						runners[i].baseindex++;
 					}
 				}
 			}
-
 		}
-		else
-		{
+		else {
 			// the batter is out
-			for (i=0; i<MAX_RUNNERS; i++)
-			{
-				if (runners[i].enabled)
-				{
-					if (runners[i].baseindex < FIRSTBASE)
-					{
+			for (i=0; i<MAX_RUNNERS; i++) {
+				if (runners[i].enabled) {
+					if (runners[i].baseindex < FIRSTBASE) {
 						runners[i].enabled = FALSE;
 						break;
 					}
 				}
 			}
 			// move the remaining runners back to the previous base
-			for (i=0; i<MAX_RUNNERS; i++)
-			{
-				if (runners[i].enabled)
-				{
+			for (i=0; i<MAX_RUNNERS; i++) {
+				if (runners[i].enabled) {
 					runners[i].baseindex -= (runners[i].baseindex) % 3;
 				}
 			}
@@ -449,566 +433,377 @@ static void ResetOffBaseRunners()
 	}
 }
 
-static void DoOut()
+static enum FSM HitBall()
 {
-	// clear the screen
-	ClearAllDisplay();
-
-	Baseball_PlaySound(BASEBALL_SOUND_OUT, PLAYSOUNDFLAGS_ASYNC|PLAYSOUNDFLAGS_PRIORITY);
-
-	Platform_Pause(500);
-	fsm = FSM_OUT;
-}
-
-static void HitBall(int nPosition)
-{
-	// I am not positive of the logic for this, so I'm
-	// localizing it in this function for clarity and
-	// to make it easier to tweak until it seems right.
+	// This routine was totally rewritten by Nebiun
 	//
 	// There are 3 positions where you can hit the ball:
 	//  - right in front of the plate
 	//  - directly over the plate
 	//  - right behind the plate
 	//
-	// In addition, each position is sampled 3 times:
-	//  - early
-	//  - dead on
-	//  - late
+	// In addition, each position is sampled more times related 
+	// to the ball speed (random and depending from game level) 
 	//
 	// Finally, there are 5 catchers that can field the ball:
 	//  - left and right infield
 	//  - left, center and right outfield
 	// 
-	// nPosition represents a value from 0 to 8, with 0
-	// representing the earliest possible swing, 8 being
-	// the latest possible swing, and 4 being dead on.
-	//
-	//                  |...^...|
-	//                  012345678
-	//
-	// 0 will be fielded by left infield
-	//  1 will be fielded by either left infield or left outfield
-	//   2 will be fielded by left outfield
-	//    3 will be fielded by either left or center outfield
-	//     4 will be a home run or fielded by center outfield
-	//    5 will be fielded by either right or center outfield
-	//   6 will be fielded by right outfield
-	//  7 will be fielded by either right infield or right outfield
-	// 8 will be fielded by right infield
-	//
 	// The ball will either be fielded normally or it will be
 	// a fly out and will be counted as an out. If the ball is
 	// fielded normally, we pick a random fielding time (1,2 or 3
 	// beeps), and a random runner speed.
-
-	nDefenseBlip = -1;
-
-	BOOL bOut = (Platform_Random(4) == 0) ? TRUE:FALSE;
-	if (bOut)
-	{
-		bCaught = TRUE;
-
-		// pop fly - pick a fielder
-		switch (nPosition)
-		{
-		case 0:
-			// left infield
-			nDefenseBlip = 0;
-			break;
-		case 1:
-			// either left infield or left outfield
-			nDefenseBlip = Platform_Random(2) ? 0:1;
-			break;
-		case 2:
-			// left outfield
-			nDefenseBlip = 1;
-			break;
-		case 3:
-			// either left or center outfield
-			nDefenseBlip = Platform_Random(2) ? 1:2;
-			break;
-		default:
-		case 4:
-			// center outfield
-			nDefenseBlip = 2;
-			break;
-		case 5:
-			// either right or center outfield
-			nDefenseBlip = Platform_Random(2) ? 2:3;
-			break;
-		case 6:
-			// right outfield
-			nDefenseBlip = 3;
-			break;
-		case 7:
-			// either right infield or right outfield
-			nDefenseBlip = Platform_Random(2) ? 3:4;
-			break;
-		case 8:
-			// right infield
-			nDefenseBlip = 4;
-			break;
-		}
-
-		DoOut();
-		return;
-	}
-	else
-	{
-		BOOL bHomeRun = FALSE;
-		switch (nPosition)
-		{
-		case 0:
-			// left infield
-			nDefenseBlip = 0;
-			break;
-		case 1:
-			// either left infield or left outfield
-			nDefenseBlip = Platform_Random(2) ? 0:1;
-			break;
-		case 2:
-			// left outfield
-			nDefenseBlip = 1;
-			break;
-		case 3:
-			// either left or center outfield
-			nDefenseBlip = Platform_Random(2) ? 1:2;
-			break;
-		default:
-		case 4:
-			// center outfield (or home run)
-			if (Platform_Random(4)==0)
-			{
-				bHomeRun = TRUE;
-			}
-			else
-			{
-				nDefenseBlip = 2;
-			}
-			break;
-		case 5:
-			// either right or center outfield
-			nDefenseBlip = Platform_Random(2) ? 2:3;
-			break;
-		case 6:
-			// right outfield
-			nDefenseBlip = 3;
-			break;
-		case 7:
-			// either right infield or right outfield
-			nDefenseBlip = Platform_Random(2) ? 3:4;
-			break;
-		case 8:
-			// right infield
-			nDefenseBlip = 4;
-			break;
-		}
-
-		if (bHomeRun)
-		{
-
-			fireWorks = 1;
-			fsm = FSM_HOMERUN;
-		}
+	int side, force;
+	
+	if(nPitchIndex == 5) {
+		if(Platform_Random(10) == 0)	// left-handed batter
+			side = RIGHT_FIELD;		
 		else
-		{
-			// light up the defense player that is fielding the ball
-			DrawDefenseBlip(nDefenseBlip);
-
-			// pick a random fielding speed and play
-			// the correct number of base tones
-			int bases = Platform_Random(3)+1;
-			nTimerFielding = (50 * bases); // emperically derived magic number
-			for (int i=0; i<bases; i++)
-			{
-				Baseball_PlaySound(BASEBALL_SOUND_HIT, PLAYSOUNDFLAGS_ASYNC|PLAYSOUNDFLAGS_PRIORITY);
-				Platform_Pause(320);
-			}
-
-			// pick a random runner speed
-			nTimerRunnerMove = nRunnerSpeed = 10 + Platform_Random(10);
-
-			// insert a runner
-			InsertRunner();
-
-			fsm = FSM_RUN;
+			side = LEFT_FIELD;
+	}
+	else if(nPitchIndex == 7) {
+		if(Platform_Random(10) == 0)	// left-handed batter
+			side = LEFT_FIELD;		
+		else
+			side = RIGHT_FIELD;
+	}
+	else {
+		switch(Platform_Random(5)) {
+		case 0:
+			side = LEFT_FIELD;
+			break;
+		case 1:
+			side = RIGHT_FIELD;
+			break;
+		default:
+			side = CENTER_FIELD;
+			break;
 		}
 	}
+
+	if((nPitchSpeed <= 1) || (nSwingSlot < nPitchSpeed)) {
+		force = 1;
+	}
+	else {
+		force = 0;
+	}
+	
+	switch(side) {
+	case LEFT_FIELD:
+		if((force == 0) || (Platform_Random(5) == 0))
+			nDefenseBlip = DEEP_3RD;
+		else
+			nDefenseBlip = Platform_Random(2) ? DEEP_3RD : OUT_LEFT;
+		break;
+	case RIGHT_FIELD:
+		if((force == 0) || (Platform_Random(5) == 0))
+			nDefenseBlip = DEEP_1ST;
+		else
+			nDefenseBlip = Platform_Random(2) ? DEEP_1ST : OUT_RIGHT;
+		break;
+	default:
+		if((force == 0) || (Platform_Random(5) == 0))
+			nDefenseBlip = Platform_Random(2) ? OUT_LEFT : OUT_RIGHT;
+		else 
+			nDefenseBlip = OUT_CENTER;	
+		break;
+	}
+
+	// Out ?
+	if (Platform_Random(4) == 0) {	
+		bCaught = TRUE;
+		return FSM_GOOUT;
+	}
+
+	// Homerun
+	if ((force == 1) && 
+	    (((side == CENTER_FIELD) && (Platform_Random(4) == 0)) || (Platform_Random(25) == 0))) {
+		nDefenseBlip = -1;
+		fireWorks = 1;
+		return FSM_HOMERUN;
+	}
+	
+	Baseball_DrawStats(-1, -1, nBalls, nStrikes, bHomeTeam);
+	
+	// pick a random fielding speed and play
+	// the correct number of base tones
+	int level = Baseball_GetSkill();
+	int bases = Platform_Random(3)+1;
+	nTimerFielding = (MAGIC_NUMBER * bases) - (level * Platform_Random(10)); 
+	for (int i=0; i<bases; i++) {
+		Baseball_PlaySound(BASEBALL_SOUND_HIT, PLAYSOUNDFLAGS_PRIORITY);
+		Platform_Pause(200);
+	}
+
+	// pick a random runner speed:
+	// slow or medium or fast 
+	nTimerRunnerMove = nRunnerSpeed = SPEED_BASE * (1 + Platform_Random(3));
+	
+	// insert a runner
+	InsertRunner();
+	return FSM_RUN;
+}
+
+static long long Baseball_Clock(int f)
+{
+	static struct timeval tv_start;
+	struct timeval tv, tv_delta;
+	long long rtn;
+	
+	if(f == 1) {
+		gettimeofday(&tv_start, NULL);
+		return 0;
+	}
+	gettimeofday(&tv, NULL);
+	timersub(&tv, &tv_start, &tv_delta);
+    
+	rtn = tv_delta.tv_sec * 1000000 + tv_delta.tv_usec; 
+	return rtn;
+}
+
+static BOOL run()
+{
+	if (--nTimerRunnerMove <= 0) {
+		nTimerRunnerMove = nRunnerSpeed;
+		if (MoveRunners()) {
+			// record runs
+			if (bHomeTeam) {
+				++nHRuns;
+			}
+			else {
+				++nVRuns;
+			}
+			// also note the run for later (for the sounds)
+			++nPendingRuns;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static void pendigRunNotify()
+{		
+	while(nPendingRuns > 0) {
+		Baseball_PlaySound(BASEBALL_SOUND_RUN, PLAYSOUNDFLAGS_PRIORITY);
+		Platform_Pause(200);
+		--nPendingRuns;
+	}
+	bDisplayOff = (nPendingRuns > 0) ? TRUE : FALSE;
+}
+
+// FINITE STATE MACHINE STUFF
+static void fsmGoOut(int tu)
+{
+	static int delay = 0;
+	
+	if(delay == 0) {
+		delay = 1000 * 600;
+		bDisplayOff = TRUE;
+		Baseball_PlaySound(BASEBALL_SOUND_OUT, PLAYSOUNDFLAGS_ASYNC|PLAYSOUNDFLAGS_PRIORITY);
+		Baseball_Clock(1);
+	}
+	else if(Baseball_Clock(0) >= delay) {
+		delay = 0;
+		bDisplayOff = FALSE;
+		fsm = FSM_OUT;	
+	}	
 }
 
 static void fsmOut(int tu)
 {
 	++nOuts;
-	if (nOuts == 3)
-	{
+	if (nOuts == 3) {
 		// end of possession
 
 		// but first play any pending run sounds
-		while(nPendingRuns > 0)
-		{
-			Baseball_PlaySound(BASEBALL_SOUND_RUN, PLAYSOUNDFLAGS_ASYNC|PLAYSOUNDFLAGS_PRIORITY);
-			Platform_Pause(600);
-			--nPendingRuns;
-		}
+		if(nPendingRuns > 0)
+			pendigRunNotify();
 
 		nOuts = 0;
 		bHomeTeam = !bHomeTeam;
-		if (!bHomeTeam)
-		{
+		if (!bHomeTeam) {
 			++nInnings;
-			if (nInnings == 5)
-			{
+			if (nInnings == 5) {
 				// ************************
 				// ****** GAME OVER *******
 				// ************************
 				Baseball_PlaySound(BASEBALL_SOUND_ENDGAME, PLAYSOUNDFLAGS_ASYNC|PLAYSOUNDFLAGS_PRIORITY);
-				Platform_Pause(200);
 				fsm = FSM_GAMEOVER;
 				return;
 			}
 		}
 		PlatformSetInput(bHomeTeam);
-		Baseball_PlaySound(BASEBALL_SOUND_ENDPOSSESSION, PLAYSOUNDFLAGS_PRIORITY);	
-		RestoreAllDisplay();
+		Baseball_PlaySound(BASEBALL_SOUND_ENDPOSSESSION, PLAYSOUNDFLAGS_PRIORITY|PLAYSOUNDFLAGS_ASYNC);	
 		Baseball_DrawStats(-1, -1, nBalls, nStrikes, bHomeTeam);
 		fsm = FSM_ENDPOSSESSION;
 	}
-	else
-	{
-		RestoreAllDisplay();
+	else {
 		Baseball_DrawStats(-1, -1, nBalls, nStrikes, bHomeTeam);
-		nTimerEndPlayWait = (nDefenseBlip == -1) ? (1500/50) : (3000/50);
+		nStrikes = 0;
+		nBalls = 0;
+		nTimerEndPlayWait = (nDefenseBlip == -1) ? 1500 : 3000;
+		Baseball_Clock(1);
 		fsm = FSM_ENDPLAYWAIT;
 	}
-	nStrikes = 0;
-	nBalls = 0;
 }
-
-
-// FINITE STATE MACHINE STUFF
 
 static void fsmIdle(int tu)
 {
 	// play the run sounds
-	while(nPendingRuns > 0)
-	{
-		Baseball_PlaySound(BASEBALL_SOUND_RUN, PLAYSOUNDFLAGS_ASYNC|PLAYSOUNDFLAGS_PRIORITY);
-		Platform_Pause(600);
-		--nPendingRuns;
-	}
+	if(nPendingRuns > 0) 
+		pendigRunNotify();
 
 	nCurrentRunnerIndex = -1;
 	nDefenseBlip = -1;
 	bCaught = FALSE;
-
-	if (Baseball_GetInputSCORE(NULL))
-	{
+	nBallBlip = -1;
+	
+	if (Baseball_GetInputSCORE(NULL)) {
 		Baseball_DrawScore(nVRuns, nHRuns);
 	}
-	else
-	{
+	else {
 		Baseball_DrawStats(nInnings+1, nOuts, nBalls, nStrikes, bHomeTeam);
 	}
 
 	// wait for pitch button
-	if (Baseball_GetInputPITCH(NULL))
-	{
+	if (Baseball_GetInputPITCH(NULL)) {
 		// delay from 1.5 to 2.5 seconds (according to manual)
 		// before pitching the ball
-
-		// access of game context info from here is probably not too cool
-		nTimerPitchWait = (Platform_Random(1000) + 1500) / gGameContext[GAME_BASEBALL].tu;
+		nTimerPitchWait = 1000 * (1500 + Platform_Random(1000)); // Microsecs
+		Baseball_Clock(1);
 		fsm = FSM_PITCHWAIT;
 	}
-	Baseball_DrawBaseBlip(FALSE, 0);
-	DrawBaseBlips(TRUE);
 }
 
 static void fsmPitchWait(int tu)
 {
 	Baseball_DrawScore(-1, -1);
-
-	if (nTimerPitchWait > 0)
-	{
-		--nTimerPitchWait;
-	}
-
-	if (nTimerPitchWait <= 0)
-	{
+	
+	if (Baseball_Clock(0) >= nTimerPitchWait) {
+		int level = Baseball_GetSkill();
+		
 		// pick a ball speed and throw style
 		// and pitch the ball
-		bCurveball = (Platform_Random(3) == 0) ? TRUE : FALSE;
-		if (bCurveball)
-		{
-			nPitchSpeed = Platform_Random(2)+1; // curve balls are a little slower
+		bCurveball = (Platform_Random(3 - level) == 0) ? TRUE : FALSE;
+		if (bCurveball) {
+			nPitchSpeed = (3 - level) + Platform_Random(2 - level); // curve balls are a little slower
 		}
-		else
-		{
-			nPitchSpeed = Platform_Random(3);
+		else {
+			nPitchSpeed = (2 - level) + Platform_Random(3 - level);
 		}
+	
+		nSwingSlot = nPitchSpeed;	
+		nPitchIndex = 0;
+		nBallBlip = (bCurveball) ? CURVE_BALL(nPitchIndex) : NORMAL_BALL(nPitchIndex);
 
-#ifdef __PALMOS__
-		nPitchSpeed += 7; // PALMOS ONLY
-#endif
-		
-		nPitchIndex = -1;
+		bStrike = FALSE;
 		fsm = FSM_PITCHING;
 	}
 }
 
 static void fsmPitching(int tu)
 {
-	BOOL bStrike = FALSE;
-	static int nswing;	// swing early=0, center=1, late=2
-	int nMissChance = 5;
-
-	if(nPitchIndex == -1) {
-		Baseball_DrawScore(-1, -1);
-		nEraseIndex = -1;
-		nPitchIndex = 0;
-		nswing = 0;
-	}
+	const int nMissChance = 5;
 	
-	if(nPitchIndex <= 8)
-	{
-		if (nEraseIndex != -1)
-		{
-			Baseball_DrawPitchBlip(FALSE, nEraseIndex, bCurveball);
-		}
-
-		Baseball_DrawPitchBlip(TRUE, nPitchIndex, bCurveball);
-		nEraseIndex = nPitchIndex;
-
-		// check for swing at 3 different points
-		// we really only need to check 3 times
-		// when the ball is in the strike zone, but
-		// we'll do it anyway to keep the timing consistant
-
-		// see HitBall() function for detailed description
-		// of what it does and what the parameter means
-
-		if (Baseball_GetInputHIT(NULL))
-		{
-			// swing early
-			switch (nPitchIndex)
-			{
-			case 5:
-				if (Platform_Random(nMissChance)==0)
-				{
-					// missed
-					bStrike = TRUE;
-					break;
-				}
-				else
-				{
-					HitBall(0+nswing);
-					return;
-				}
-			case 6:
-				if (Platform_Random(nMissChance)==0)
-				{
-					// missed
-					bStrike = TRUE;
-					break;
-				}
-				else
-				{
-					HitBall(3+nswing);
-					return;
-				}
-			case 7:
-				if (Platform_Random(nMissChance)==0)
-				{
-					// missed
-					bStrike = TRUE;
-					break;
-				}
-				else
-				{
-					HitBall(6+nswing);
-					return;
-				}
-			default:
-				// strike
-				bStrike = TRUE;
-				break;
+	if(nPitchIndex <= 8) {
+		if(Baseball_GetInputHIT(NULL)) {			
+			if((nPitchIndex >= 5) && (nPitchIndex <= 7) && (Platform_Random(nMissChance) != 0)) {
+				fsm = HitBall();
 			}
-		}
-		
-		if (!bStrike) {
-			int	nDelay = ((nPitchSpeed * 4) / 3) - tu;
-			
-			if(nDelay > 0)
-				Platform_Pause(nDelay);
-			nswing++;
-			if(nswing == 3) {
-				nPitchIndex++;
-				nswing = 0;
+			else {
+				bStrike = TRUE;
+				nPitchIndex = 9;
 			}
 		}
 		else {
-			nPitchIndex = 9;
+			if(--nSwingSlot <= 0) {	
+				nSwingSlot = nPitchSpeed;			
+				++nPitchIndex;
+			}
 		}
 	}
-	
-	if(nPitchIndex >= 9) {
-		Platform_Pause(200);
-
+	else {
 		// if player didn't swing, randomly pick strike or ball
-		if (Platform_Random(2) && !bStrike)
-		{
+		if (Platform_Random(2) && !bStrike) {
 			++nBalls;
 		}
-		else
-		{
+		else {
 			++nStrikes;
 		}
 
-		if (nBalls == 4)
-		{
+		if (nBalls == 4) {
 			// walk
 			Baseball_DrawStats(-1, -1, nBalls, nStrikes, bHomeTeam);
-			Baseball_PlaySound(BASEBALL_SOUND_STRIKE, PLAYSOUNDFLAGS_PRIORITY);
-			nTimerEndPlayWait = 1500/50;
-			nTimerRunnerMove = nRunnerSpeed = 10; // walk is always a set speed
+			Baseball_PlaySound(BASEBALL_SOUND_STRIKE, PLAYSOUNDFLAGS_PRIORITY|PLAYSOUNDFLAGS_ASYNC);
+			nTimerRunnerMove = nRunnerSpeed = 2 * SPEED_BASE; // walk is always a fixed speed
 			InsertRunner();
 			fsm = FSM_WALK;
 		}
-		else if (nStrikes == 3)
-		{
+		else if (nStrikes == 3) {
 			// struck out
-			DoOut();
+			fsm = FSM_GOOUT;
 		}
-		else
-		{
+		else {
 			Baseball_DrawStats(-1, -1, nBalls, nStrikes, bHomeTeam);
-			Baseball_PlaySound(BASEBALL_SOUND_STRIKE, PLAYSOUNDFLAGS_PRIORITY);
-			nTimerEndPlayWait = 1500/50;
+			Baseball_PlaySound(BASEBALL_SOUND_STRIKE, PLAYSOUNDFLAGS_PRIORITY|PLAYSOUNDFLAGS_ASYNC);
+			nTimerEndPlayWait = 1500;
 			fsm = FSM_ENDPLAYWAIT;
 		}
 	}
+	
+	if(nPitchIndex <= 8)
+		nBallBlip = (bCurveball) ? CURVE_BALL(nPitchIndex) : NORMAL_BALL(nPitchIndex);
 }
 
 static void fsmEndPlayWait(int tu)
 {
-	if (nTimerEndPlayWait > 0)
-	{
-		--nTimerEndPlayWait;
-		if (nDefenseBlip != -1)
-		{
-			// blink fielder if one caught a ball
-			if (bCaught)
-			{
-				static BOOL blink=FALSE;
-				static int blinkcnt=0;
-				--blinkcnt;
-				if (blinkcnt<0)
-				{
-					blinkcnt=2;
-					blink=!blink;
-				}
-				if (blink)
-				{
-					DrawDefenseBlip(nDefenseBlip);
-				}
-				else
-				{
-					DrawDefenseBlip(-1);
-				}
-			}
-			else
-			{
-				DrawDefenseBlip(nDefenseBlip);
-			}
-		}
+	static int delay = 0;
+	
+	if(delay == 0) {
+		delay = 1000 * nTimerEndPlayWait;
+		Baseball_Clock(1);
 	}
-	else
-	{
-		// erase the old blips
-		Baseball_DrawPitchBlip(FALSE, nEraseIndex, bCurveball);
-		DrawDefenseBlip(-1);
-		ErasePitchBlips();
-
+	else if(Baseball_Clock(0) >= delay) {
+		delay = 0;
 		// reset the runners
 		ResetOffBaseRunners();
-		DrawBaseBlips(FALSE);
-
 		fsm = FSM_IDLE;
 	}
 }
 
 static void fsmRun(int tu)
 {
-	DrawBaseBlips(TRUE);
-
 	// RUN does not take effect until you release HIT
-	if (Baseball_GetInputRUN(NULL) && !Baseball_GetInputHIT(NULL))
-	{
-		if (nTimerRunnerMove > 0)
-		{
-			--nTimerRunnerMove;
-		}
-		if (nTimerRunnerMove == 0)
-		{
-			nTimerRunnerMove = nRunnerSpeed;
-			if (MoveRunners())
-			{
-				// record runs
-				if (bHomeTeam)
-				{
-					++nHRuns;
-				}
-				else
-				{
-					++nVRuns;
-				}
-				// also note the run for later (for the sounds)
-				++nPendingRuns;
-			}
-		}
+	if (Baseball_GetInputRUN(NULL) && !Baseball_GetInputHIT(NULL)) {
+		run();
 	}
 
-	if (nTimerFielding > 0)
-	{
-		--nTimerFielding;
-	}
-	if (nTimerFielding == 0)
-	{
+	if (--nTimerFielding <= 0) {
 		// ball is finished being fielded
-
-		// erase the fielder's blip
-//		nDefenseBlip = -1;
-//		DrawDefenseBlip(-1);
 
 		// ball has been fielded - see if any runners are off base
 		BOOL bOffBase = FALSE;
-		for (int i=0; i<MAX_RUNNERS; i++)
-		{
-			if (runners[i].enabled)
-			{
+		for (int i=0; i<MAX_RUNNERS; i++) {
+			if (runners[i].enabled) {
 				if ((runners[i].baseindex != FIRSTBASE)
 					&& (runners[i].baseindex != SECONDBASE)
 					&& (runners[i].baseindex != THIRDBASE)
-					&& (runners[i].baseindex != HOMEPLATE))
-				{
+					&& (runners[i].baseindex != HOMEPLATE)) {
 					bOffBase = TRUE;
 					break;
 				}
 			}
 		}
-		if (bOffBase)
-		{
+		if (bOffBase) {
 			// somebody is out -- go through the 'out' theatrics
-			DoOut();
+			fsm = FSM_GOOUT;
 		}
-		else
-		{
+		else {
 			// all runners are safe
 			Baseball_DrawStats(-1, -1, nBalls, nStrikes, bHomeTeam);
 			nBalls=0;
 			nStrikes=0;
-			nTimerEndPlayWait = 1500/50;
+			nTimerEndPlayWait = 1500;
 			fsm = FSM_ENDPLAYWAIT;
 		}
 	}
@@ -1016,42 +811,15 @@ static void fsmRun(int tu)
 
 static void fsmWalk(int tu)
 {
-	DrawBaseBlips(TRUE);
-
-	if (Baseball_GetInputRUN(NULL))
-	{
-		if (nTimerRunnerMove > 0)
-		{
-			--nTimerRunnerMove;
-		}
-		if (nTimerRunnerMove == 0)
-		{
-			nTimerRunnerMove = nRunnerSpeed;
-			if (MoveRunners())
-			{
-				// record runs
-				if (bHomeTeam)
-				{
-					++nHRuns;
-				}
-				else
-				{
-					++nVRuns;
-				}
-				// also note the run for later (for the sounds)
-				++nPendingRuns;
-			}
-
+	if (Baseball_GetInputRUN(NULL)) {
+		if(run() == TRUE) {
 			// when the current runner gets on first, we're done
-			if (runners[nCurrentRunnerIndex].baseindex == FIRSTBASE)
-			{
+			if (runners[nCurrentRunnerIndex].baseindex == FIRSTBASE) {
 				// got someone on first - all done
 				nStrikes = 0;
 				nBalls = 0;
-				Baseball_DrawPitchBlip(FALSE, 8, FALSE);
-				DrawDefenseBlip(-1);
-				ErasePitchBlips();
-				fsm = FSM_IDLE;
+				nTimerEndPlayWait = 1500;
+				fsm = FSM_ENDPLAYWAIT;
 			}
 		}
 	}
@@ -1061,139 +829,14 @@ static void fsmHomeRun(int tu)
 {
 	static int loop = 0;
 	
-	trace = fireWorks;
 	if(fireWorks > 0) {
 		//
 		// do fireworks display
-		//
-		Platform_Pause(40);
-		ClearAllDisplay();		
+		//	
 		
-		switch(fireWorks) {
-		case 1:	// base and fielder blips
+		if(fireWorks == 1)
 			Baseball_PlaySound(BASEBALL_SOUND_RUN, PLAYSOUNDFLAGS_PRIORITY|PLAYSOUNDFLAGS_ASYNC);
-			Baseball_DrawBaseBlip(TRUE,1);
-			break;
-		case 2:
-			Baseball_DrawBaseBlip(TRUE,1);
-			Baseball_DrawBaseBlip(TRUE,2);
-			break;
-		case 3:
-			Baseball_DrawBaseBlip(TRUE,1);
-			Baseball_DrawBaseBlip(TRUE,2);
-			Baseball_DrawDeepBlip(TRUE,0);
-			break;
-		case 4:
-			Baseball_DrawBaseBlip(TRUE,2);
-			Baseball_DrawDeepBlip(TRUE,0);
-			Baseball_DrawBaseBlip(TRUE,4);
-			break;
-		case 5:
-			Baseball_DrawDeepBlip(TRUE,0);
-			Baseball_DrawBaseBlip(TRUE,4);
-			Baseball_DrawBaseBlip(TRUE,5);
-			break;
-		case 6:
-			Baseball_DrawBaseBlip(TRUE,4);
-			Baseball_DrawBaseBlip(TRUE,5);
-			Baseball_DrawDeepBlip(TRUE,1);
-			break;		
-		case 7:
-			Baseball_DrawBaseBlip(TRUE,5);
-			Baseball_DrawDeepBlip(TRUE,1);
-			Baseball_DrawBaseBlip(TRUE,8);
-			break;
-		case 8:
-			Baseball_DrawDeepBlip(TRUE,1);
-			Baseball_DrawBaseBlip(TRUE,8);	
-			Baseball_DrawBaseBlip(TRUE,7);
-			break;			
-		case 9:
-			Baseball_DrawBaseBlip(TRUE,8);	
-			Baseball_DrawBaseBlip(TRUE,7);
-			Baseball_DrawOutfieldBlip(TRUE,0);
-			break;		
-		case 10:	
-			Baseball_DrawBaseBlip(TRUE,7);
-			Baseball_DrawOutfieldBlip(TRUE,0);
-			Baseball_DrawOutfieldBlip(TRUE,1);
-			break;		
-		case 11:	
-			Baseball_DrawOutfieldBlip(TRUE,0);
-			Baseball_DrawOutfieldBlip(TRUE,1);
-			Baseball_DrawFireWorks();
-			break;
-		case 12:
-			Baseball_DrawOutfieldBlip(TRUE,1);
-			Baseball_DrawFireWorks();
-			Baseball_DrawBaseBlip(TRUE,10);
-			break;
-		case 13:
-			Baseball_DrawFireWorks();
-			Baseball_DrawBaseBlip(TRUE,10);
-			Baseball_DrawBaseBlip(TRUE,11);
-			break;
-		case 14:
-			Baseball_DrawBaseBlip(TRUE,10);
-			Baseball_DrawBaseBlip(TRUE,11);
-			Baseball_DrawPitchBlip(TRUE, 8, FALSE);
-			break;
-		case 15:
-			Baseball_DrawPitchBlip(TRUE, 8, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 7, FALSE);
-			break;
-		case 16:
-			Baseball_DrawPitchBlip(TRUE, 8, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 7, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 6, FALSE);
-			break;
-		case 17:
-			Baseball_DrawPitchBlip(TRUE, 7, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 6, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 5, FALSE);
-			break;
-		case 18:
-			Baseball_DrawPitchBlip(TRUE, 6, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 5, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 4, TRUE);
-			break;
-		case 19:
-			Baseball_DrawPitchBlip(TRUE, 5, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 3, TRUE);
-			Baseball_DrawPitchBlip(TRUE, 2, TRUE);
-			break;
-		case 20:
-			Baseball_DrawPitchBlip(TRUE, 3, TRUE);
-			Baseball_DrawPitchBlip(TRUE, 2, TRUE);
-			Baseball_DrawPitchBlip(TRUE, 1, TRUE);
-			break;
-		case 21:
-			Baseball_DrawPitchBlip(TRUE, 2, TRUE);
-			Baseball_DrawPitchBlip(TRUE, 1, TRUE);
-			Baseball_DrawPitchBlip(TRUE, 1, FALSE);
-			break;		
-		case 22:
-			Baseball_DrawPitchBlip(TRUE, 1, TRUE);
-			Baseball_DrawPitchBlip(TRUE, 1, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 2, FALSE);
-			break;	
-		case 23:
-			Baseball_DrawPitchBlip(TRUE, 1, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 2, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 3, FALSE);
-			break;
-		case 24:
-			Baseball_DrawPitchBlip(TRUE, 2, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 3, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 4, FALSE);
-			break;
-		case 25:
-			Baseball_DrawPitchBlip(TRUE, 3, FALSE);
-			Baseball_DrawPitchBlip(TRUE, 4, FALSE);
-			break;								
-		case 26:
-			break;
-		}
+		Platform_Pause(40);
 		
 		fireWorks++;
 		if(fireWorks > 26) {
@@ -1203,7 +846,7 @@ static void fsmHomeRun(int tu)
 				fireWorks = 0;
 				// insert a runner
 				InsertRunner();
-				nTimerRunnerMove = nRunnerSpeed = 10; // fixed run speed
+				nTimerRunnerMove = nRunnerSpeed = 2 * SPEED_BASE; // fixed run speed
 			}
 			else {
 				fireWorks = 1;
@@ -1212,54 +855,21 @@ static void fsmHomeRun(int tu)
 		return;
 	}
 
-	DrawBaseBlips(TRUE);
-
-	Baseball_DrawBaseBlip(TRUE, 0);
-
-	if (Baseball_GetInputRUN(NULL))
-	{
-		if (nTimerRunnerMove > 0)
-		{
-			--nTimerRunnerMove;
-		}
-		if (nTimerRunnerMove == 0)
-		{
-			nTimerRunnerMove = nRunnerSpeed;
-			if (MoveRunners())
-			{
-				// record runs
-				if (bHomeTeam)
-				{
-					++nHRuns;
+	if (Baseball_GetInputRUN(NULL)) {
+		if (run() == TRUE) {
+			// see if anyone is still running the bases
+			BOOL bManOnBase = FALSE;
+			for (int i=0; i<MAX_RUNNERS; i++) {
+				if (runners[i].enabled) {
+					bManOnBase = TRUE;
+					break;
 				}
-				else
-				{
-					++nVRuns;
-				}
-				// also note the run for later (for the sounds)
-				++nPendingRuns;
-
-				// see if anyone is still running the bases
-				BOOL bManOnBase = FALSE;
-				for (int i=0; i<MAX_RUNNERS; i++)
-				{
-					if (runners[i].enabled)
-					{
-						bManOnBase = TRUE;
-						break;
-					}
-				}
-
-				if (!bManOnBase)
-				{
-					// nobody on base - all done
-					nStrikes = 0;
-					nBalls = 0;
-					Baseball_DrawPitchBlip(FALSE, 8, FALSE);
-					DrawDefenseBlip(-1);
-					ErasePitchBlips();
-					fsm = FSM_IDLE;
-				}
+			}
+			if (!bManOnBase) {
+				// nobody on base - all done
+				nStrikes = 0;
+				nBalls = 0;
+				fsm = FSM_IDLE;
 			}
 		}
 	}
@@ -1268,60 +878,49 @@ static void fsmHomeRun(int tu)
 static void fsmEndPossession(int tu)
 {
 	// wait for SCORE key
-	if (Baseball_GetInputSCORE(NULL))
-	{
+	if (Baseball_GetInputSCORE(NULL)) {
 		nOuts = 0;
 		nStrikes = 0;
 		nBalls = 0;
 
-		nEraseIndex = -1;
-
 		// remove all runners
-		for (int i=0; i<MAX_RUNNERS; i++)
-		{
+		for (int i=0; i<MAX_RUNNERS; i++) {
 			runners[i].enabled = FALSE;
 		}
 
-		DrawBaseBlips(FALSE);
 		Baseball_DrawStats(nInnings+1, nOuts, nBalls, nStrikes, bHomeTeam);
-		DrawDefenseBlip(-1);
-		ErasePitchBlips();
-
 		fsm = FSM_IDLE;
-	}
-	else
-	{
-		if (nDefenseBlip != -1)
-		{
-			// blink fielder if one caught a ball
-			if (bCaught)
-			{
-				static BOOL blink=FALSE;
-				static int blinkcnt=0;
-				--blinkcnt;
-				if (blinkcnt<0)
-				{
-					blinkcnt=2;
-					blink=!blink;
-				}
-				if (blink)
-				{
-					DrawDefenseBlip(nDefenseBlip);
-				}
-				else
-				{
-					DrawDefenseBlip(-1);
-				}
-			}
-			else
-			{
-				DrawDefenseBlip(nDefenseBlip);
-			}
-		}
 	}
 }
 
 static void fsmGameOver(int tu)
 {
 	Baseball_DrawScore(nVRuns, nHRuns);
+}
+
+#define LINE_STEP	20
+void Baseball_Debug(int f)
+{
+
+	int w, h;
+	int y = 0;
+	
+	Baseball_GetSize(&w, &h);
+	
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "fsm =%d", fsm);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "pitch i=%d s=%d", nPitchIndex, nPitchSpeed);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "pitch w=%d", nTimerPitchWait/1000);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "curve =%d", bCurveball);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "Play tim =%d", nTimerEndPlayWait);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "Field tim =%d",  nTimerFielding);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "Swing =%d", nSwingSlot);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "Speed =%d", nRunnerSpeed);
+	y += LINE_STEP;
 }

@@ -1,0 +1,4 @@
+BUGS
+- if you switch to another program then back, focus is not set to game window
+- baseball: no pro2 support
+- football2: if game is tied after a quarter of overtime, game never ends!

@@ -34,27 +34,26 @@ Website : http://www.peterhirschberg.com
 */
 
 #include "spacealert.h"
+#include "slide2_png.h"
+#include "slide3_png.h"
 #include "spacealert_screen_png.h"
-#include "spacealert_poweron_png.h"
-#include "spacealert_poweroff_png.h"
-#include "spacealert_aimleft_png.h"
-#include "spacealert_aimcenter_png.h"
-#include "spacealert_aimright_png.h"
+#include "missileattack_screen_png.h"
 #include "spacealert_fire_raw.h"
 #include "spacealert_hit_raw.h"
 #include "spacealert_lose_raw.h"
 #include "spacealert_win_raw.h"
 #include "spacealert_raider_raw.h"
 
+#define SPACE_ALERT		0
+#define MISSILE_ATTACK	1
+
 // images
 static GRRLIB_texImg *bmpScreen;
-static GRRLIB_texImg *bmpPowerOn;
-static GRRLIB_texImg *bmpPowerOff;
-static GRRLIB_texImg *bmpAimLeft;
-static GRRLIB_texImg *bmpAimCenter;
-static GRRLIB_texImg *bmpAimRight;
+static GRRLIB_texImg *bmpPower;
+static GRRLIB_texImg *bmpAim;
 
 static int nStick = 1;
+static int game = -1;
 
 static BOOL bRaiderSound = FALSE;
 static BOOL bRaiderSoundPlaying = FALSE;
@@ -62,58 +61,81 @@ static BOOL bRaiderSoundPlaying = FALSE;
 static void StartRaiderSound();
 static void StopRaiderSound();
 
-static Sound_t tcWaveRes[5];
+static Sound_t tcWaveRes[SPACEALERT_SOUND_NSOUNDS];
 static Blip_t blip[SPACEALERT_BLIP_COLUMNS][SPACEALERT_BLIP_ROWS];
 static Stat_t digit[2];
-static Help_t help[] = {
+static Help_t SpaceAlert_help[] = {
 	{ WK_2, { 86, 122 } },
 	{ WK_BUD, { 88, 224 } },
 	{ WK_LR, { 156, 265 } }
+};
+static Help_t MissileAttack_help[] = {
+	{ WK_2, { 73, 98 } },
+	{ WK_BUD, { 71, 180 } },
+	{ WK_LR, { 166, 284 } }
 };
 //----------------------------------------------------------------------------
 //
 //
 void SpaceAlert_Help()
 {
-	Platform_Help(help, sizeof(help)/sizeof(*help));
+	Platform_Help(SpaceAlert_help, sizeof(SpaceAlert_help)/sizeof(*SpaceAlert_help));
+}
+void MissileAttack_Help()
+{
+	Platform_Help(MissileAttack_help, sizeof(MissileAttack_help)/sizeof(*MissileAttack_help));
 }
 
 static BOOL bInited = FALSE;
 
-void SpaceAlert_Init()
+static void game_init()
 {
 	int x, y;
-	if (bInited) return;
+	if (bInited) 
+		return;
 
 	// Init sounds
-	Sound_set(&tcWaveRes[0], spacealert_fire_raw, spacealert_fire_raw_size, 109);
-	Sound_set(&tcWaveRes[1], spacealert_hit_raw, spacealert_hit_raw_size, 284);
-	Sound_set(&tcWaveRes[2], spacealert_lose_raw, spacealert_lose_raw_size, 1243);
-	Sound_set(&tcWaveRes[3], spacealert_win_raw, spacealert_win_raw_size, 850);
-	Sound_set(&tcWaveRes[4], spacealert_raider_raw, spacealert_raider_raw_size, 3902);
+	Sound_set(&tcWaveRes[SPACEALERT_SOUND_FIRE], spacealert_fire_raw, spacealert_fire_raw_size, 109);
+	Sound_set(&tcWaveRes[SPACEALERT_SOUND_HIT], spacealert_hit_raw, spacealert_hit_raw_size, 284);
+	Sound_set(&tcWaveRes[SPACEALERT_SOUND_LOSE], spacealert_lose_raw, spacealert_lose_raw_size, 1243);
+	Sound_set(&tcWaveRes[SPACEALERT_SOUND_WIN], spacealert_win_raw, spacealert_win_raw_size, 850);
+	Sound_set(&tcWaveRes[SPACEALERT_SOUND_RAIDER], spacealert_raider_raw, spacealert_raider_raw_size, 3902);
 	
 	// load images
-	bmpScreen = GRRLIB_LoadTexture(spacealert_screen_png);
-	bmpPowerOn = GRRLIB_LoadTexture(spacealert_poweron_png);
-	bmpPowerOff = GRRLIB_LoadTexture(spacealert_poweroff_png);
-	bmpAimLeft = GRRLIB_LoadTexture(spacealert_aimleft_png);
-	bmpAimCenter = GRRLIB_LoadTexture(spacealert_aimcenter_png);
-	bmpAimRight = GRRLIB_LoadTexture(spacealert_aimright_png);
+	if(game == SPACE_ALERT)
+		bmpScreen = GRRLIB_LoadTexture(spacealert_screen_png);
+	else
+		bmpScreen = GRRLIB_LoadTexture(missileattack_screen_png);
+	
+	bmpPower = GRRLIB_LoadTexture(slide2_png);
+	bmpAim   = GRRLIB_LoadTexture(slide3_png);
 
 	// set blips 
 	for (y = 0; y < SPACEALERT_BLIP_ROWS; y++){
 		for (x = 0; x < SPACEALERT_BLIP_COLUMNS; x++){
 			Blip_t *pblip = &blip[x][y];
 	
-			pblip->x = (int)((x * ((float)spacealert_blip_xspacing/100)) + spacealert_blip_x);
-			pblip->y = (int)((y * ((float)spacealert_blip_yspacing/100)) + spacealert_blip_y);
+			if(game == SPACE_ALERT) {
+				pblip->x = (int)((x * ((float)spacealert_blip_xspacing/100)) + spacealert_blip_x);
+				pblip->y = (int)((y * ((float)spacealert_blip_yspacing/100)) + spacealert_blip_y);
+			}
+			else {
+				pblip->x = (int)((x * ((float)missileattack_blip_xspacing/100)) + missileattack_blip_x);
+				pblip->y = (int)((y * ((float)missileattack_blip_yspacing/100)) + missileattack_blip_y);
+			}
 			pblip->status = -1;
 		}
 	}
 	// set digits
 	for(x = 0; x < 2; x++) {
-		digit[x].x = spacealert_digit_x + x * spacealert_digit_spacing;
-		digit[x].y = spacealert_digit_y;
+		if(game == SPACE_ALERT) {
+			digit[x].x = spacealert_digit_x + x * spacealert_digit_spacing;
+			digit[x].y = spacealert_digit_y;
+		}
+		else {
+			digit[x].x = missileattack_digit_x + x * missileattack_digit_spacing;
+			digit[x].y = missileattack_digit_y;
+		}
 	}
 	PlatformSetInput(0);
 	// start with the game off
@@ -122,18 +144,35 @@ void SpaceAlert_Init()
 	bInited = TRUE;
 }
 
+void SpaceAlert_Init()
+{
+	game = SPACE_ALERT;
+	game_init();
+}
+
+void MissileAttack_Init()
+{
+	game = MISSILE_ATTACK;
+	game_init();
+}
+
+void SpaceAlert_StopSound()
+{
+	bRaiderSoundPlaying = FALSE;
+	bRaiderSound = FALSE;
+
+	// stop all sounds...
+	Platform_StopSound();
+}
+
 void SpaceAlert_DeInit()
 {
 	// stop all sounds...
-	Platform_StopSound();
-	bRaiderSoundPlaying = FALSE;
-	
+	SpaceAlert_StopSound();
+	SpaceAlert_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
-	GRRLIB_FreeTexture(bmpPowerOff);
-	GRRLIB_FreeTexture(bmpPowerOn);
-	GRRLIB_FreeTexture(bmpAimLeft);
-	GRRLIB_FreeTexture(bmpAimCenter);
-	GRRLIB_FreeTexture(bmpAimRight);
+	GRRLIB_FreeTexture(bmpPower);
+	GRRLIB_FreeTexture(bmpAim);
 
 	bInited = FALSE;
 }
@@ -152,11 +191,14 @@ void SpaceAlert_Paint()
 	}
 	
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 	// visualize the control states
 	if (power){
-		GRRLIB_DrawImg(realx(spacealert_power_x), realy(spacealert_power_y), bmpPowerOn, 0, 1, 1, 0xFFFFFFFF);
+		if(game == SPACE_ALERT)
+			GRRLIB_DrawImg(realx(spacealert_power_x), realy(spacealert_power_y+5), bmpPower, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
+		else
+			GRRLIB_DrawImg(realx(missileattack_power_x), realy(missileattack_power_y+5), bmpPower, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 		for (y = 0; y < SPACEALERT_BLIP_ROWS; y++){
 			for (x = 0; x < SPACEALERT_BLIP_COLUMNS; x++){
@@ -168,24 +210,24 @@ void SpaceAlert_Paint()
 		// Draw points
 		for(x = 0; x < 2; x++)
 			draw_digit(digit[x].x, digit[x].y, digit[x].val);	
-		// Draw stick
-		switch (nStick)
-		{
-		case 0:
-			GRRLIB_DrawImg(realx(spacealert_slider_x), realy(spacealert_slider_y), bmpAimLeft, 0, 1, 1, 0xFFFFFFFF);
-			break;
-		case 1:
-			GRRLIB_DrawImg(realx(spacealert_slider_x), realy(spacealert_slider_y), bmpAimCenter, 0, 1, 1, 0xFFFFFFFF);
-			break;
-		case 2:
-			GRRLIB_DrawImg(realx(spacealert_slider_x), realy(spacealert_slider_y), bmpAimRight, 0, 1, 1, 0xFFFFFFFF);
-			break;
-		}
 	} 
 	else {
-		GRRLIB_DrawImg(realx(spacealert_power_x), realy(spacealert_power_y), bmpPowerOff, 0, 1, 1, 0xFFFFFFFF);
+		if(game == SPACE_ALERT)
+			GRRLIB_DrawImg(realx(spacealert_power_x), realy(spacealert_power_y+27), bmpPower, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
+		else
+			GRRLIB_DrawImg(realx(missileattack_power_x), realy(missileattack_power_y+27), bmpPower, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	}
-
+	// Draw stick
+	if(game == SPACE_ALERT) {
+		x = realx(spacealert_slider_x);
+		y = realy(spacealert_slider_y);
+	}
+	else {
+		x = realx(missileattack_slider_x);
+		y = realy(missileattack_slider_y);
+	}
+	
+	GRRLIB_DrawImg(x+2+(nStick * 20), y, bmpAim, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);		
 }
 
 void SpaceAlert_ClearScreen()
@@ -219,16 +261,6 @@ void SpaceAlert_PlaySound(int nSound, unsigned int nFlags)
 
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void SpaceAlert_StopSound()
-{
-	bRaiderSoundPlaying = FALSE;
-	bRaiderSound = FALSE;
-
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's
@@ -346,25 +378,23 @@ BOOL SpaceAlert_GetInputFIRE(BOOL *pChange)
 {
 	static BOOL bLast = FALSE;
 
-	if (pChange){ *pChange = FALSE; }
+	if (pChange) { 
+		*pChange = FALSE; 
+	}
 
 	// check the keys
-	if (Platform_GetInput2())
-	{
-		if (!bLast)
-		{
-			if (pChange)
-			{
+	if (Platform_GetInput2()) {
+		if (!bLast) {
+			if (pChange) {
 				*pChange = TRUE;
 			}
 		}
 		bLast = TRUE;
-		return TRUE;
 	}
-
-	bLast = FALSE;
-
-	return FALSE;
+	else {
+		bLast = FALSE;
+	}
+	return bLast;
 }
 
 void SpaceAlert_GetSize(int *w, int *h)
@@ -372,5 +402,3 @@ void SpaceAlert_GetSize(int *w, int *h)
 	*w = bmpScreen->w;
 	*h = bmpScreen->h;
 }
-
-

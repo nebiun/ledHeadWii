@@ -47,8 +47,9 @@ Website : http://www.peterhirschberg.com
 #define SUBCHASE_SOUND_CHARGE		1
 #define SUBCHASE_SOUND_HIT			2
 #define SUBCHASE_SOUND_SINK			3
+#define SUBCHASE_SOUND_NSOUNDS		4
 
-void SubChase_Run();
+void SubChase_Run(int tu);
 void SubChase_SetSkill(int i);
 int SubChase_GetSkill();
 void SubChase_PowerOn();

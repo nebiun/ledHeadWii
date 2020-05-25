@@ -53,8 +53,9 @@ Website : http://www.peterhirschberg.com
 #define HOCKEY_SOUND_STEAL			6
 #define HOCKEY_SOUND_ENDPERIOD		7
 #define HOCKEY_SOUND_ENDGAME		8
+#define HOCKEY_SOUND_NSOUNDS		9
 
-void Hockey_Run();
+void Hockey_Run(int tu);
 void Hockey_SetSkill(int i);
 int Hockey_GetSkill();
 void Hockey_PowerOn();

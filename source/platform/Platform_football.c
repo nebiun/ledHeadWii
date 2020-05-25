@@ -35,9 +35,6 @@ Website : http://www.peterhirschberg.com
 
 #include "football.h"
 #include "football_screen_png.h"
-#include "football_poweroff_png.h"
-#include "football_pro1_png.h"
-#include "football_pro2_png.h"
 #include "football_tick_raw.h"
 #include "football_endplay_raw.h"
 #include "football_endpossession_raw.h"
@@ -45,11 +42,8 @@ Website : http://www.peterhirschberg.com
 
 // images
 static GRRLIB_texImg *bmpScreen;
-static GRRLIB_texImg *bmpPowerOff;
-static GRRLIB_texImg *bmpPro1;
-static GRRLIB_texImg *bmpPro2;
 
-static Sound_t tcWaveRes[4];
+static Sound_t tcWaveRes[FOOTBALL_SOUND_NSOUDS];
 static Blip_t blip[FOOTBALL_BLIP_COLUMNS][FOOTBALL_BLIP_ROWS];
 static Digit_t digit[7] = { 
 	{football_digit_x, football_digit_y, -1},
@@ -82,21 +76,17 @@ void Football_Init()
 {
 	int x, y;
 	
-	if (bInited) return;
+	if (bInited) 
+		return;
 
 	// Init sounds	
-	Sound_set(&tcWaveRes[0], football_tick_raw, football_tick_raw_size, 25);
-	Sound_set(&tcWaveRes[1], football_endplay_raw, football_endplay_raw_size, 489);
-	Sound_set(&tcWaveRes[2], football_endpossession_raw, football_endpossession_raw_size, 984);
-	Sound_set(&tcWaveRes[3], football_score_raw, football_score_raw_size, 1335);
+	Sound_set(&tcWaveRes[FOOTBALL_SOUND_TICK], football_tick_raw, football_tick_raw_size, 25);
+	Sound_set(&tcWaveRes[FOOTBALL_SOUND_ENDPLAY], football_endplay_raw, football_endplay_raw_size, 489);
+	Sound_set(&tcWaveRes[FOOTBALL_SOUND_ENDPOSSESSION], football_endpossession_raw, football_endpossession_raw_size, 984);
+	Sound_set(&tcWaveRes[FOOTBALL_SOUND_SCORE], football_score_raw, football_score_raw_size, 1335);
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(football_screen_png);
-
-	// set up the power switch images
-	bmpPowerOff = GRRLIB_LoadTexture(football_poweroff_png);
-	bmpPro1 = GRRLIB_LoadTexture(football_pro1_png);
-	bmpPro2 = GRRLIB_LoadTexture(football_pro2_png);
 
 	// init blips positions
 	for (y = 0; y < FOOTBALL_BLIP_ROWS; y++){
@@ -122,14 +112,18 @@ void Football_Init()
 	bInited = TRUE;
 }
 
-void Football_DeInit()
+void Football_StopSound()
 {
 	// stop all sounds...
 	Platform_StopSound();
+}
+
+void Football_DeInit()
+{
+	// stop all sounds...
+	Football_StopSound();
+	Football_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
-	GRRLIB_FreeTexture(bmpPowerOff);
-	GRRLIB_FreeTexture(bmpPro1);
-	GRRLIB_FreeTexture(bmpPro2);
 	bInited = FALSE;
 }
 
@@ -139,38 +133,34 @@ void Football_Paint()
 	BOOL power = Football_GetPower();
 	BOOL skill = Football_GetSkill();
 	int p_switch;
-	p_switch = Platform_GetPowerSwitch(ONOFF_OFF12);
-	if(power) {
-		if(p_switch == -1) {
-			if(skill == 0)
-				Football_PowerOff();
-			if(skill == 1) {
-				Football_PowerOn();
-				Football_SetSkill(0);
-			}		
-		} 
-		if(p_switch == 1) {
-			if(skill == 0) {
-				Football_PowerOn();
-				Football_SetSkill(1);
-			}
-		} 
-	}
-	else {
-		if(p_switch == 1) {
+	p_switch = Platform_GetPowerSwitch(ONOFF_1OFF2);
+	if(p_switch == -1) {
+		if(!power) {
 			Football_PowerOn();
 			Football_SetSkill(0);
-		} 
+		}
+		else if(power && skill == 1) {
+			Football_PowerOff();
+		}
+	}
+	else if(p_switch == 1) {
+		if(!power) {
+			Football_PowerOn();
+			Football_SetSkill(1);
+		}
+		else if(power && skill == 0) {
+			Football_PowerOff();
+		}
 	}
 	
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xffffffff);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xffffffff);
 	// visualize the control states
 	if (power){
 		if (skill == 0){
-			GRRLIB_DrawImg(realx(football_pro_1_x), realy(football_pro_1_y), bmpPro1, 0, 1, 1, 0xffffffff);
+			draw_switch(SWITCH_TYPE_3, football_pro_1_x, football_pro_1_y, SWITCH_POS_PRO1);
 		} else {
-			GRRLIB_DrawImg(realx(football_pro_2_x), realy(football_pro_2_y), bmpPro2, 0, 1, 1, 0xffffffff);
+			draw_switch(SWITCH_TYPE_3, football_pro_1_x, football_pro_1_y, SWITCH_POS_PRO2);
 		}
 
 		for (y = 0; y < FOOTBALL_BLIP_ROWS; y++){
@@ -184,7 +174,7 @@ void Football_Paint()
 		}
 	} 
 	else {
-		GRRLIB_DrawImg(realx(football_power_off_x), realy(football_power_off_y), bmpPowerOff, 0, 1, 1, 0xffffffff);
+		draw_switch(SWITCH_TYPE_3, football_pro_1_x, football_pro_1_y, SWITCH_POS_OFF);
 	}
 	
 }
@@ -212,13 +202,6 @@ void Football_PlaySound(int nSound, unsigned int nFlags)
 {
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void Football_StopSound()
-{
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's

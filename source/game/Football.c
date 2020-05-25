@@ -181,18 +181,6 @@ static PLAYER player[NUM_DEFENSEPLAYERS];
 	} \
 }
 
-static BOOL ISBALL(int x, int y);
-static BOOL ISBALL(int x, int y)
-{
-	if ((ball.nColumn == x)
-		&& (ball.nLane == y)
-		&& (ball.nBright)){
-		return TRUE;
-	}
-	return FALSE;
-}
-
-static BOOL ISDEFENSE(int x, int y);
 static BOOL ISDEFENSE(int x, int y)
 {
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
@@ -205,19 +193,6 @@ static BOOL ISDEFENSE(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISOCCUPIED(int x, int y);
-static BOOL ISOCCUPIED(int x, int y)
-{
-	if (ISBALL(x,y)){
-		return TRUE;
-	}
-	if (ISDEFENSE(x,y)){
-		return TRUE;
-	}
-	return FALSE;
-}
-
-static int GETPLAYERAT(int x, int y);
 static int GETPLAYERAT(int x, int y){
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
 		if ((player[i].nColumn == x)
@@ -237,8 +212,6 @@ static int GETPLAYERAT(int x, int y){
 
 #define ISPLAYEROFFSCREEN(p) \
 	((p.nColumn > FOOTBALL_BLIP_COLUMNS-1) || (p.nColumn < 0))
-
-
 
 // finite state machine stuff
 
@@ -263,12 +236,93 @@ static FSMFCN fsmfcn[] = {
 	fsmGameOver
 };
 
+static void InitGame()
+{
+	bHomeTeam = TRUE;
+	PlatformSetInput(bHomeTeam);
+	
+	nHScore = 0;
+	nVScore = 0;
+	fGameTime = 15.0;
+	nDown = 0;
+	nQuarter = 0;
+	nCurrentYardline = 100 - 20;
+	nFirstDownYard = nCurrentYardline - 10;
 
-// proto's
-static void InitGame();
-static void DrawBlips();
-static void EraseBlips();
+	bDisplayScore = FALSE;
+	bDisplayTime = FALSE;
+	bDisplayYard = FALSE;
+	bDisplayDown = FALSE;
+	bDisplayBlips = TRUE;
+	
+	fsm = FSM_FORMATION;
+}
 
+static void DrawBlips()
+{
+	int x, y, nBright;
+	static int nBlinkTimer = 0;
+	static BOOL bBlink = FALSE;
+
+	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
+		if (player[i].nBright != BLIP_OFF){
+			x = player[i].nColumn % 10;
+			y = player[i].nLane;
+			nBright = player[i].nBright;
+			Blips[x][y] = nBright;
+		}
+	}
+	if (ball.nBright != BLIP_OFF){
+		x = ball.nColumn % 10;
+		y = ball.nLane;
+		nBright = ball.nBright;
+		Blips[x][y] = nBright;
+	}
+
+	// draw the blips field
+	for (y = 0; y < FOOTBALL_BLIP_ROWS; y++){
+		for (x = 0; x < FOOTBALL_BLIP_COLUMNS; x++){
+
+			switch(Blips[x][y]){
+				case BLIP_OFF:
+				case BLIP_DIM:
+				case BLIP_BRIGHT:
+					Football_DrawBlip(Blips[x][y], x, y);
+					break;
+				case BLIP_DIMBLINK:
+					if (!bBlink){
+						Football_DrawBlip(BLIP_DIM, x, y);
+					} else {
+						Football_DrawBlip(BLIP_OFF, x, y);
+					}
+					break;
+				case BLIP_BRIGHTBLINK:
+					if (bBlink){
+						Football_DrawBlip(BLIP_BRIGHT, x, y);
+					} else {
+						Football_DrawBlip(BLIP_OFF, x, y);
+					}
+					break;
+			}
+
+		}
+	}
+
+	if (--nBlinkTimer <= 0){
+		nBlinkTimer = 4;
+		bBlink = !bBlink;
+	}
+}
+
+static void EraseBlips()
+{
+	// erase the blips field
+	for (int y = 0; y < FOOTBALL_BLIP_ROWS; y++){
+		for (int x = 0; x < FOOTBALL_BLIP_COLUMNS; x++){
+			Football_DrawBlip(BLIP_OFF, x, y);
+		}
+	}
+}
 
 BOOL Football_GetPower()
 {
@@ -297,28 +351,6 @@ void Football_SetSkill(int i){
 
 int Football_GetSkill(){
 	return bPro2 ? 1 : 0;
-}
-
-void InitGame()
-{
-	bHomeTeam = TRUE;
-	PlatformSetInput(bHomeTeam);
-	
-	nHScore = 0;
-	nVScore = 0;
-	fGameTime = 15.0;
-	nDown = 0;
-	nQuarter = 0;
-	nCurrentYardline = 100 - 20;
-	nFirstDownYard = nCurrentYardline - 10;
-
-	bDisplayScore = FALSE;
-	bDisplayTime = FALSE;
-	bDisplayYard = FALSE;
-	bDisplayDown = FALSE;
-	bDisplayBlips = TRUE;
-	
-	fsm = FSM_FORMATION;
 }
 
 void Football_Run(int tu)
@@ -386,72 +418,6 @@ void Football_Run(int tu)
 
 	bInFrame = FALSE;
 
-}
-
-void DrawBlips()
-{
-	int x, y, nBright;
-	static int nBlinkTimer = 0;
-	static BOOL bBlink = FALSE;
-
-	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
-		if (player[i].nBright != BLIP_OFF){
-			x = player[i].nColumn % 10;
-			y = player[i].nLane;
-			nBright = player[i].nBright;
-			Blips[x][y] = nBright;
-		}
-	}
-	if (ball.nBright != BLIP_OFF){
-		x = ball.nColumn % 10;
-		y = ball.nLane;
-		nBright = ball.nBright;
-		Blips[x][y] = nBright;
-	}
-
-	// draw the blips field
-	for (y = 0; y < FOOTBALL_BLIP_ROWS; y++){
-		for (x = 0; x < FOOTBALL_BLIP_COLUMNS; x++){
-
-			switch(Blips[x][y]){
-				case BLIP_OFF:
-				case BLIP_DIM:
-				case BLIP_BRIGHT:
-					Football_DrawBlip(Blips[x][y], x, y);
-					break;
-				case BLIP_DIMBLINK:
-					if (!bBlink){
-						Football_DrawBlip(BLIP_DIM, x, y);
-					} else {
-						Football_DrawBlip(BLIP_OFF, x, y);
-					}
-					break;
-				case BLIP_BRIGHTBLINK:
-					if (bBlink){
-						Football_DrawBlip(BLIP_BRIGHT, x, y);
-					} else {
-						Football_DrawBlip(BLIP_OFF, x, y);
-					}
-					break;
-			}
-
-		}
-	}
-
-	if (--nBlinkTimer <= 0){
-		nBlinkTimer = 4;
-		bBlink = !bBlink;
-	}
-}
-
-void EraseBlips()
-{
-	// erase the blips field
-	for (int y = 0; y < FOOTBALL_BLIP_ROWS; y++){
-		for (int x = 0; x < FOOTBALL_BLIP_COLUMNS; x++){
-			Football_DrawBlip(BLIP_OFF, x, y);
-		}
-	}
 }
 
 // FINITE STATE MACHINE STUFF
@@ -793,7 +759,6 @@ static void fsmPlayEnded()
 
 }
 
-
 static void fsmGameOver()
 {
 	bDisplayTime = TRUE;
@@ -802,8 +767,3 @@ static void fsmGameOver()
 	bDisplayDown = FALSE;
 	bDisplayBlips = FALSE;
 }
-
-
-
-
-

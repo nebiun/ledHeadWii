@@ -2,6 +2,10 @@
  * LEDhead for Wii
  * Copyright (C) 2017-2020 Nebiun
  *
+ * Based on the handheld electronic games by Mattel Electronics.
+ * All trademarks copyrighted by their respective owners. This
+ * program is not affiliated or endorsed by Mattel Electronics.
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or

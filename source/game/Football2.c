@@ -49,7 +49,6 @@ static BLIP Blips[FOOTBALL2_BLIP_COLUMNS][FOOTBALL2_BLIP_ROWS];
 static BOOL bHomeTeam;
 static BOOL bInFrame = FALSE;
 static BOOL bPower;
-static BOOL bPro2 = FALSE;
 static BOOL bGotFirstDown;
 
 static BOOL bDisplayScore;
@@ -65,7 +64,7 @@ static int nFirstDownYard;
 static int nDown;
 static int nQuarter;
 static int nCurrentYardline;
-
+static int nLevel = -1;
 static int nPassingStart;
 
 static int nKickoffStart;
@@ -190,7 +189,6 @@ static PLAYER player[NUM_DEFENSEPLAYERS];
 	} \
 }
 
-static BOOL ISBALL(int x, int y);
 static BOOL ISBALL(int x, int y)
 {
 	if ((ball.nColumn == x)
@@ -201,7 +199,6 @@ static BOOL ISBALL(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISRECEIVER(int x, int y);
 static BOOL ISRECEIVER(int x, int y)
 {
 	if ((receiver.nColumn == x)
@@ -212,7 +209,6 @@ static BOOL ISRECEIVER(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISDEFENSE(int x, int y);
 static BOOL ISDEFENSE(int x, int y)
 {
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
@@ -225,7 +221,6 @@ static BOOL ISDEFENSE(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISOCCUPIED(int x, int y);
 static BOOL ISOCCUPIED(int x, int y)
 {
 	if (ISBALL(x,y)){
@@ -240,7 +235,6 @@ static BOOL ISOCCUPIED(int x, int y)
 	return FALSE;
 }
 
-static int GETPLAYERAT(int x, int y);
 static int GETPLAYERAT(int x, int y){
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
 		if ((player[i].nColumn == x)
@@ -262,7 +256,6 @@ static int GETPLAYERAT(int x, int y){
 	((p.nColumn > FOOTBALL2_BLIP_COLUMNS-1) || (p.nColumn < 0))
 
 
-
 // finite state machine stuff
 
 static void fsmKickoffWait();
@@ -277,8 +270,11 @@ static void fsmPassing();
 static void fsmSafety();
 static void fsmPlayEnded();
 static void fsmGameOver();
+static void fsmTurnover();
+static void fsmOutPlay();
 
-static enum FSM {
+enum FSM {
+	FSM_INVALID=-1,
 	FSM_KICKOFFWAIT=0,
 	FSM_KICKOFFCHARGE,
 	FSM_KICKOFFMIDAIR,
@@ -290,8 +286,12 @@ static enum FSM {
 	FSM_PASSING,
 	FSM_SAFETY,
 	FSM_PLAYENDED,
-	FSM_GAMEOVER
-}fsm;
+	FSM_GAMEOVER,
+	FSM_TURNOVER,
+	FSM_OUTPLAY
+};
+
+static enum FSM fsm, nextFsm;
 
 typedef void (*FSMFCN)();
 
@@ -307,16 +307,99 @@ static FSMFCN fsmfcn[] = {
 	fsmPassing,
 	fsmSafety,
 	fsmPlayEnded,
-	fsmGameOver
+	fsmGameOver,
+	fsmTurnover,
+	fsmOutPlay
 };
 
+static void InitGame()
+{
+	bHomeTeam = FALSE;
+	PlatformSetInput(bHomeTeam);
+	
+	nHScore = 0;
+	nVScore = 0;
+	fGameTime = 15.0;
+	nDown = -1;
+	nQuarter = 0;
+	nCurrentYardline = 35;
 
-// proto's
-static void InitGame();
-static void DrawBlips();
-static void EraseBlips();
+	bDisplayScore = FALSE;
+	bDisplayTime = TRUE;
+	bDisplayYard = FALSE;
+	bDisplayDown = FALSE;
+	bDisplayBlips = TRUE;
+	
+	fsm = FSM_KICKOFFWAIT;
+}
 
+static void DrawBlips()
+{
+	int x, y, nBright;
+	static BOOL blink = FALSE;
 
+	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
+		if (player[i].nBright != BLIP_OFF){
+			x = player[i].nColumn % 10;
+			y = player[i].nLane;
+			nBright = player[i].nBright;
+			Blips[x][y] = nBright;
+		}
+	}
+	if (receiver.nBright != BLIP_OFF){
+		x = receiver.nColumn % 10;
+		y = receiver.nLane;
+		nBright = receiver.nBright;
+		Blips[x][y] = nBright;
+	}
+	if (ball.nBright != BLIP_OFF){
+		x = ball.nColumn % 10;
+		y = ball.nLane;
+		nBright = ball.nBright;
+		Blips[x][y] = nBright;
+	}
+
+	// draw the blips field
+	for (y = 0; y < FOOTBALL2_BLIP_ROWS; y++){
+		for (x = 0; x < FOOTBALL2_BLIP_COLUMNS; x++){
+
+			switch(Blips[x][y]){
+				case BLIP_OFF:
+				case BLIP_DIM:
+				case BLIP_BRIGHT:
+					Football2_DrawBlip(Blips[x][y], x, y);
+					break;
+				case BLIP_DIMBLINK:
+					if (!blink){
+						Football2_DrawBlip(BLIP_DIM, x, y);
+					} else {
+						Football2_DrawBlip(BLIP_OFF, x, y);
+					}
+					break;
+				case BLIP_BRIGHTBLINK:
+					if (blink){
+						Football2_DrawBlip(BLIP_BRIGHT, x, y);
+					} else {
+						Football2_DrawBlip(BLIP_OFF, x, y);
+					}
+					break;
+			}
+
+		}
+	}
+
+	blink = !blink;
+}
+
+static void EraseBlips()
+{
+	// erase the blips field
+	for (int y = 0; y < FOOTBALL2_BLIP_ROWS; y++){
+		for (int x = 0; x < FOOTBALL2_BLIP_COLUMNS; x++){
+			Football2_DrawBlip(BLIP_OFF, x, y);
+		}
+	}
+}
 
 int Football2_GetPower()
 {
@@ -339,36 +422,11 @@ void Football2_PowerOff()
 }
 
 void Football2_SetSkill(int i){
-	if (i == 0){
-		bPro2 = FALSE;
-	} else {
-		bPro2 = TRUE;
-	}
+	nLevel = i;
 }
 
 int Football2_GetSkill(){
-	return bPro2 ? 1 : 0;
-}
-
-void InitGame()
-{
-	bHomeTeam = FALSE;
-	PlatformSetInput(bHomeTeam);
-	
-	nHScore = 0;
-	nVScore = 0;
-	fGameTime = 15.0;
-	nDown = -1;
-	nQuarter = 0;
-	nCurrentYardline = 35;
-
-	bDisplayScore = FALSE;
-	bDisplayTime = TRUE;
-	bDisplayYard = FALSE;
-	bDisplayDown = FALSE;
-	bDisplayBlips = TRUE;
-	
-	fsm = FSM_KICKOFFWAIT;
+	return nLevel;
 }
 
 void Football2_Run(int tu)
@@ -432,75 +490,20 @@ void Football2_Run(int tu)
 
 }
 
-void DrawBlips()
-{
-	int x, y, nBright;
-	static BOOL blink = FALSE;
-
-	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
-		if (player[i].nBright != BLIP_OFF){
-			x = player[i].nColumn % 10;
-			y = player[i].nLane;
-			nBright = player[i].nBright;
-			Blips[x][y] = nBright;
-		}
-	}
-	if (receiver.nBright != BLIP_OFF){
-		x = receiver.nColumn % 10;
-		y = receiver.nLane;
-		nBright = receiver.nBright;
-		Blips[x][y] = nBright;
-	}
-	if (ball.nBright != BLIP_OFF){
-		x = ball.nColumn % 10;
-		y = ball.nLane;
-		nBright = ball.nBright;
-		Blips[x][y] = nBright;
-	}
-
-	// draw the blips field
-	for (y = 0; y < FOOTBALL2_BLIP_ROWS; y++){
-		for (x = 0; x < FOOTBALL2_BLIP_COLUMNS; x++){
-
-			switch(Blips[x][y]){
-				case BLIP_OFF:
-				case BLIP_DIM:
-				case BLIP_BRIGHT:
-					Football2_DrawBlip(Blips[x][y], x, y);
-					break;
-				case BLIP_DIMBLINK:
-					if (!blink){
-						Football2_DrawBlip(BLIP_DIM, x, y);
-					} else {
-						Football2_DrawBlip(BLIP_OFF, x, y);
-					}
-					break;
-				case BLIP_BRIGHTBLINK:
-					if (blink){
-						Football2_DrawBlip(BLIP_BRIGHT, x, y);
-					} else {
-						Football2_DrawBlip(BLIP_OFF, x, y);
-					}
-					break;
-			}
-
-		}
-	}
-
-	blink = !blink;
-}
-
-void EraseBlips()
-{
-	// erase the blips field
-	for (int y = 0; y < FOOTBALL2_BLIP_ROWS; y++){
-		for (int x = 0; x < FOOTBALL2_BLIP_COLUMNS; x++){
-			Football2_DrawBlip(BLIP_OFF, x, y);
-		}
-	}
-}
-
 // FINITE STATE MACHINE STUFF
+static void fsmTurnover()
+{
+	bHomeTeam = !bHomeTeam;
+	PlatformSetInput(bHomeTeam);
+	fsm = nextFsm;
+	nextFsm = FSM_INVALID;
+}
+
+static void fsmOutPlay()
+{
+	Football2_PlaySound(FOOTBALL2_SOUND_ENDPLAY, PLAYSOUNDFLAGS_PRIORITY);
+	fsm = FSM_PLAYENDED;
+}
 
 static void fsmKickoffWait()
 {
@@ -792,20 +795,16 @@ static void fsmKickoffRunback()
 		Football2_ClearScreen();
 		Football2_PlaySound(FOOTBALL2_SOUND_TOUCHDOWN, PLAYSOUNDFLAGS_PRIORITY);
 		Platform_IsNewSecond();
-		bHomeTeam = !bHomeTeam;
-		PlatformSetInput(bHomeTeam);
 		nCurrentYardline = 35;
-		fsm = FSM_KICKOFFWAIT;
+		nextFsm = FSM_KICKOFFWAIT;
+		fsm = FSM_TURNOVER;
 		return;
 	}
-
 
 	// check for collisions
 	if (ISDEFENSE(ball.nColumn, ball.nLane)){
 		// tackled!
 		Football2_ClearScreen();
-		Football2_PlaySound(FOOTBALL2_SOUND_ENDPLAY, PLAYSOUNDFLAGS_PRIORITY);
-
 		int i = GETPLAYERAT(ball.nColumn, ball.nLane);
 		if (i != -1){
 			SETPLAYERBRIGHTNESS(player[i], BLIP_DIMBLINK);
@@ -817,13 +816,13 @@ static void fsmKickoffRunback()
 		nFirstDownYard = ball.nYard - 10;
 
 		Platform_IsNewSecond();
-		fsm = FSM_PLAYENDED;
+		fsm = FSM_OUTPLAY;
 		return;
 	}
 
 
 	// move the defense randomly towards the ball
-	if (Platform_Random(100) < ((bPro2) ? 25 : 15)){
+	if (Platform_Random(100) < ((nLevel%2) ? 25 : 15)){
 		int i = Platform_Random(NUM_DEFENSEPLAYERS);
 		if (player[i].nBright){
 			// pick horizontal or vertical movement toward the ball
@@ -875,7 +874,6 @@ static void fsmKickoffRunback()
 	if (ISDEFENSE(ball.nColumn, ball.nLane)){
 		// tackled!
 		Football2_ClearScreen();
-		Football2_PlaySound(FOOTBALL2_SOUND_ENDPLAY, PLAYSOUNDFLAGS_PRIORITY);
 
 		int i = GETPLAYERAT(ball.nColumn, ball.nLane);
 		if (i != -1){
@@ -888,7 +886,7 @@ static void fsmKickoffRunback()
 		nFirstDownYard = ball.nYard - 10;
 
 		Platform_IsNewSecond();
-		fsm = FSM_PLAYENDED;
+		fsm = FSM_OUTPLAY;
 		return;
 	}
 
@@ -986,9 +984,6 @@ static void fsmFormation()
 		if (bChange)
 		{
 			// punt
-
-			bHomeTeam = !bHomeTeam;
-			PlatformSetInput(bHomeTeam);
 			nDown = 0;
 			ball.nYard = MAX_YARD - ball.nYard;
 			nCurrentYardline = ball.nYard;
@@ -1006,7 +1001,8 @@ static void fsmFormation()
 			SETPLAYERBRIGHTNESS(ball, BLIP_BRIGHTBLINK);
 			Platform_IsNewSecond();
 			bPunting = TRUE;
-			fsm = FSM_KICKOFFMIDAIR;
+			nextFsm = FSM_KICKOFFMIDAIR;
+			fsm = FSM_TURNOVER;
 			return;
 		}
 	}
@@ -1091,8 +1087,6 @@ static void fsmInPlay()
 	if (Football2_GetInputKICK(NULL) && bCanKick){
 
 		// field goal attempt!
-		bHomeTeam = !bHomeTeam;
-		PlatformSetInput(bHomeTeam);
 		nDown = 0;
 		ball.nYard = MAX_YARD - ball.nYard;
 		nKickoffStart = nCurrentYardline;
@@ -1111,8 +1105,8 @@ static void fsmInPlay()
 		SETPLAYERBRIGHTNESS(ball, BLIP_BRIGHTBLINK);
 		Platform_IsNewSecond();
 		bFieldGoalAttempt = TRUE;
-		fsm = FSM_KICKOFFMIDAIR;
-
+		nextFsm = FSM_KICKOFFMIDAIR;
+		fsm = FSM_TURNOVER;
 		return;
 	}
 
@@ -1146,10 +1140,9 @@ static void fsmInPlay()
 		Football2_ClearScreen();
 		Football2_PlaySound(FOOTBALL2_SOUND_TOUCHDOWN, PLAYSOUNDFLAGS_PRIORITY);
 		Platform_IsNewSecond();
-		bHomeTeam = !bHomeTeam;
-		PlatformSetInput(bHomeTeam);
 		nCurrentYardline = 35;
-		fsm = FSM_KICKOFFWAIT;
+		nextFsm = FSM_KICKOFFWAIT;
+		fsm = FSM_TURNOVER;
 		return;
 	}
 
@@ -1175,31 +1168,24 @@ static void fsmInPlay()
 			fsm = FSM_SAFETY;
 			return;
 
-		} else if ((++nDown >= 4) && (!bGotFirstDown)){
-
+		}
+		if ((++nDown >= 4) && (!bGotFirstDown)){
 			// give the ball to the other team
-			bHomeTeam = !bHomeTeam;
-			PlatformSetInput(bHomeTeam);
 			nDown = 0;
 			ball.nYard = MAX_YARD - ball.nYard;
 			nFirstDownYard = ball.nYard - 10;
-
-			Football2_PlaySound(FOOTBALL2_SOUND_ENDPOSSESSION, PLAYSOUNDFLAGS_PRIORITY);
-			fsm = FSM_PLAYENDED;
+			Football2_PlaySound(FOOTBALL2_SOUND_ENDPOSSESSION, PLAYSOUNDFLAGS_PRIORITY);	
+			nextFsm = FSM_PLAYENDED;
+			fsm = FSM_TURNOVER;
 			return;
-
-		} else {
-			Football2_PlaySound(FOOTBALL2_SOUND_ENDPLAY, PLAYSOUNDFLAGS_PRIORITY);
-			fsm = FSM_PLAYENDED;
-			return;
-		}
-
+		} 
+		fsm = FSM_OUTPLAY;
 		return;
 	}
 
 
 	// move the defense randomly towards the ball
-	if (Platform_Random(100) < ((bPro2) ? 25 : 15)){
+	if (Platform_Random(100) < ((nLevel%2) ? 25 : 15)){
 		int i = Platform_Random(NUM_DEFENSEPLAYERS);
 		if (player[i].nBright){
 			// pick horizontal or vertical movement toward the ball
@@ -1235,9 +1221,8 @@ static void fsmInPlay()
 		}
 	}
 
-
 	// move the receiver randomly
-	if (Platform_Random(100) < ((bPro2) ? 15 : 5)){
+	if (Platform_Random(100) < ((nLevel%2) ? 15 : 5)){
 		if (receiver.nBright){
 			// pick horizontal or vertical movement toward the ball
 			if (Platform_Random(4) == 0){
@@ -1268,7 +1253,6 @@ static void fsmInPlay()
 		}
 	}
 
-
 	// check for collisions again
 	if (ISDEFENSE(ball.nColumn, ball.nLane)){
 		// tackled!
@@ -1291,27 +1275,20 @@ static void fsmInPlay()
 			fsm = FSM_SAFETY;
 			return;
 
-		} else if ((++nDown >= 4) && (!bGotFirstDown)){
-
+		}
+		if ((++nDown >= 4) && (!bGotFirstDown)){
 			// give the ball to the other team
-			bHomeTeam = !bHomeTeam;
-			PlatformSetInput(bHomeTeam);
 			nDown = 0;
 			ball.nYard = MAX_YARD - ball.nYard;
 			nFirstDownYard = ball.nYard - 10;
-
 			Football2_PlaySound(FOOTBALL2_SOUND_ENDPOSSESSION, PLAYSOUNDFLAGS_PRIORITY);
-			fsm = FSM_PLAYENDED;
+			nextFsm = FSM_PLAYENDED;
+			fsm = FSM_TURNOVER;
 			return;
-		} else {
-			Football2_PlaySound(FOOTBALL2_SOUND_ENDPLAY, PLAYSOUNDFLAGS_PRIORITY);
-			fsm = FSM_PLAYENDED;
-			return;
-		}
-
+		} 
+		fsm = FSM_OUTPLAY;
 		return;
 	}
-
 
 	// count down the clock
 	if (Platform_IsNewSecond()){
@@ -1330,8 +1307,7 @@ static void fsmInPlay()
 
 static void fsmPassing()
 {
-static int i = 0;
-BOOL bIntercepted = FALSE;
+	static int i = 0;
 
 	bDisplayTime = TRUE;
 	bDisplayScore = FALSE;
@@ -1361,20 +1337,18 @@ BOOL bIntercepted = FALSE;
 			if ((++nDown >= 4) && (!bGotFirstDown)){
 
 				// give the ball to the other team
-				bHomeTeam = !bHomeTeam;
-				PlatformSetInput(bHomeTeam);
 				nDown = 0;
 				ball.nYard = MAX_YARD - ball.nYard;
 				nFirstDownYard = ball.nYard - 10;
 
 				Football2_PlaySound(FOOTBALL2_SOUND_ENDPOSSESSION, PLAYSOUNDFLAGS_PRIORITY);
-
-			} else {
-				Football2_PlaySound(FOOTBALL2_SOUND_ENDPLAY, PLAYSOUNDFLAGS_PRIORITY);
+				nextFsm = FSM_PLAYENDED;
+				fsm = FSM_TURNOVER;
+			} 
+			else {
+				fsm = FSM_OUTPLAY;
 			}
-
 			Platform_IsNewSecond();
-			fsm = FSM_PLAYENDED;
 
 		} else if (ISDEFENSE(ball.nColumn, ball.nLane)){
 
@@ -1399,14 +1373,13 @@ BOOL bIntercepted = FALSE;
 				UNMOVEPLAYER(ball);
 
 				// give the ball to the other team
-				bHomeTeam = !bHomeTeam;
-				PlatformSetInput(bHomeTeam);
 				nDown = 0;
 				ball.nYard = MAX_YARD - ball.nYard;
 				nFirstDownYard = ball.nYard - 10;
 
 				Platform_IsNewSecond();
-				fsm = FSM_PLAYENDED;
+				nextFsm = FSM_PLAYENDED;
+				fsm = FSM_TURNOVER;
 			}
 		}
 	}
@@ -1459,8 +1432,6 @@ static void fsmSafety()
 			++nQuarter;
 			if (nQuarter == 2){
 				// halftime - force kickoff
-				bHomeTeam = !bHomeTeam;
-				PlatformSetInput(bHomeTeam);
 				ball.nYard = 35;
 				nCurrentYardline = ball.nYard;
 				nFirstDownYard = nCurrentYardline - 35;
@@ -1473,11 +1444,11 @@ static void fsmSafety()
 				}
 
 				fGameTime = 15.0;
-				fsm = FSM_KICKOFFWAIT;
+				nextFsm = FSM_KICKOFFWAIT;
+				fsm = FSM_TURNOVER;
 				return;
-			} else {
-				fGameTime = 15.0;
-			}
+			} 
+			fGameTime = 15.0;
 		}
 
 		// add 2 points and set up kickoff from 20 yardline
@@ -1486,17 +1457,15 @@ static void fsmSafety()
 		} else {
 			nHScore += 2;
 		}
-		bHomeTeam = !bHomeTeam;
-		PlatformSetInput(bHomeTeam);
 		ball.nYard = 20;
 		nCurrentYardline = ball.nYard;
 		nFirstDownYard = nCurrentYardline - 10;
 
-		fsm = FSM_KICKOFFWAIT;
-		fsmKickoffWait();
+		nextFsm = FSM_KICKOFFWAIT;
+		fsm = FSM_TURNOVER;
+	//	fsmKickoffWait();
 		return;
 	}
-
 }
 
 static void fsmPlayEnded()
@@ -1554,7 +1523,15 @@ static void fsmGameOver()
 
 }
 
-
-
-
-
+#define LINE_STEP	20
+void Football2_Debug(int f)
+{
+	int w, h;
+	int y = 0;
+	Football2_GetSize(&w, &h);
+	
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "level  =%d", nLevel);
+	y += LINE_STEP;
+	debugPrintf(realx(w)+10, realy(y), 0xFFFFFFFF, "fsm    =%d", fsm);
+	y += LINE_STEP;
+}

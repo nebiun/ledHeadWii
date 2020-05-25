@@ -53,6 +53,14 @@ Website : http://www.peterhirschberg.com
 #define football2_pro_2_x 91
 #define football2_pro_2_y 295
 
+// Skills
+#define LVL_ROOKIESLOW		0		// Pro1
+#define LVL_ROOKIEFAST		1		// Pro2
+#define LVL_PROSLOW			2		// Pro1 + Kick button
+#define LVL_PROFAST			3		// Pro2 + Kick button
+
+#define IS_LVLPRO(x)		(((x) == LVL_PROSLOW) || ((x) == LVL_PROFAST))
+
 // interface that the platform must provide for this game
 
 // functions exported to the game context

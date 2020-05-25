@@ -72,10 +72,15 @@ typedef enum {
 	WK_B,
 	WK_BUD,
 	WK_BLR,
+	WK_BLR1,
 	WK_PLUS,
 	WK_MINUS,
 	WK_HOME,
 	WK_DPAD,
+	WK_U,
+	WK_D,
+	WK_L,
+	WK_R,
 	WK_LR,
 	WK_UD,
 	WK_NUMKEY
@@ -143,7 +148,11 @@ int PlatformGetInput();
 BOOL Platform_GetInputUP();
 BOOL Platform_GetInputDOWN();
 BOOL Platform_GetInputLEFT();
+BOOL Platform_GetInputLEFTUP();
+BOOL Platform_GetInputLEFTDOWN();
 BOOL Platform_GetInputRIGHT();
+BOOL Platform_GetInputRIGHTUP();
+BOOL Platform_GetInputRIGHTDOWN();
 BOOL Platform_GetInput1();
 BOOL Platform_GetInput2();
 BOOL Platform_GetInputPLUS();
@@ -155,6 +164,7 @@ BOOL Platform_GetRealTimeInputPLUS();
 BOOL Platform_GetRealTimeInputMINUS();
 
 int Platform_GetPowerSwitch(int type);
+int Platform_GetPowerSwitchPlus(int type, int *extra);
 BOOL Platform_CloseGame();
 
 #endif

@@ -36,7 +36,7 @@ Website : http://www.peterhirschberg.com
 
 #ifndef __BASEBALL_H__
 #define __BASEBALL_H__
-
+#include <sys/time.h>
 #include "Platform.h"
 #include "Platform_Baseball.h"
 
@@ -47,15 +47,10 @@ Website : http://www.peterhirschberg.com
 #define BASEBALL_SOUND_STRIKE			3
 #define BASEBALL_SOUND_ENDPOSSESSION	4
 #define BASEBALL_SOUND_ENDGAME			5
+#define BASEBALL_SOUND_NSOUNDS			6
 
-
-void Baseball_Run();
-void Baseball_SetSkill(int i);
-int Baseball_GetSkill();
-void Baseball_PowerOn();
-void Baseball_PowerOff();
-int Baseball_GetPower();
-
+void Baseball_Run(int tu);
+void Baseball_Debug(int f);
 
 #endif
 

@@ -51,12 +51,6 @@ Website : http://www.peterhirschberg.com
 
 // interface that the platform must provide for this game
 
-// Input remapping
-#define ARMORBATTLE_KEY_UP
-#define ARMORBATTLE_KEY_DOWN
-#define ARMORBATTLE_KEY_UP
-#define ARMORBATTLE_KEY_UP
-
 // functions exported to the game context
 void ArmorBattle_Init();
 void ArmorBattle_Help();

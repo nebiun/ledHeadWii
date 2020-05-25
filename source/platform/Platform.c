@@ -132,6 +132,9 @@ void Platform_StopSound()
 	ASND_StopVoice(0);
 }
 
+// Wii input code
+#define WPAD_BUTTON_DIRECTION_MASK	(WPAD_BUTTON_UP|WPAD_BUTTON_DOWN|WPAD_BUTTON_LEFT|WPAD_BUTTON_RIGHT)
+
 static u32 btn;
 static int wpad = 0;
 
@@ -169,37 +172,60 @@ int PlatformSetInput(int pad)
 	return -1;
 }
 
-int PlatformGetInput()
-{
-	return wpad;
-}
-
 BOOL Platform_GetInputUP()
 {
 	if(btn & WPAD_BUTTON_B)
 		return 0;
-	return (btn & WPAD_BUTTON_RIGHT);
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == WPAD_BUTTON_RIGHT);
 }
 
 BOOL Platform_GetInputDOWN()
 {
 	if(btn & WPAD_BUTTON_B)
 		return 0;
-	return (btn & WPAD_BUTTON_LEFT);
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == WPAD_BUTTON_LEFT);
 }
 
 BOOL Platform_GetInputLEFT()
 {
 	if(btn & WPAD_BUTTON_B)
 		return 0;
-	return (btn & WPAD_BUTTON_UP);
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == WPAD_BUTTON_UP);
+}
+
+BOOL Platform_GetInputLEFTUP()
+{
+	if(btn & WPAD_BUTTON_B)
+		return 0;
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == (WPAD_BUTTON_UP|WPAD_BUTTON_RIGHT));
+}
+
+BOOL Platform_GetInputLEFTDOWN()
+{
+	if(btn & WPAD_BUTTON_B)
+		return 0;
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == (WPAD_BUTTON_UP|WPAD_BUTTON_LEFT));
 }
 
 BOOL Platform_GetInputRIGHT()
 {
 	if(btn & WPAD_BUTTON_B)
 		return 0;
-	return (btn & WPAD_BUTTON_DOWN);
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == WPAD_BUTTON_DOWN);
+}
+
+BOOL Platform_GetInputRIGHTUP()
+{
+	if(btn & WPAD_BUTTON_B)
+		return 0;
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == (WPAD_BUTTON_DOWN|WPAD_BUTTON_RIGHT));
+}
+
+BOOL Platform_GetInputRIGHTDOWN()
+{
+	if(btn & WPAD_BUTTON_B)
+		return 0;
+	return ((btn & WPAD_BUTTON_DIRECTION_MASK) == (WPAD_BUTTON_DOWN|WPAD_BUTTON_LEFT));
 }
 
 BOOL Platform_GetInput2()
@@ -230,14 +256,7 @@ BOOL Platform_GetInputMINUS()
 	return (btn & WPAD_BUTTON_MINUS);
 }
 
-BOOL Platform_GetInputMouseDown()
-{
-	if(btn & WPAD_BUTTON_B)
-		return 0;
-	return (btn & WPAD_BUTTON_A);
-}
-
-int Platform_GetPowerSwitch(int type)
+int Platform_GetPowerSwitchPlus(int type, int *extra)
 {
 	static u32 last_btn = 0;	
 	
@@ -253,10 +272,16 @@ int Platform_GetPowerSwitch(int type)
 			case ONOFF_OFF12:
 				if(btn & WPAD_BUTTON_UP) {
 					btn &= ~WPAD_BUTTON_UP;
+					if(extra != NULL) {
+						*extra = (btn & WPAD_BUTTON_1) ? 1  : 0;
+					}
 					return -1;
 				}
 				if(btn & WPAD_BUTTON_DOWN) {
 					btn &= ~WPAD_BUTTON_DOWN;
+					if(extra != NULL) {
+						*extra = (btn & WPAD_BUTTON_1) ? 1  : 0;
+					}
 					return 1;
 				}
 				break;
@@ -275,6 +300,11 @@ int Platform_GetPowerSwitch(int type)
 		}
 	}
 	return 0;
+}
+
+int Platform_GetPowerSwitch(int type)
+{
+	return Platform_GetPowerSwitchPlus(type, NULL);
 }
 
 BOOL Platform_CloseGame()

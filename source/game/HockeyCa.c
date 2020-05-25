@@ -33,11 +33,8 @@ Website : http://www.peterhirschberg.com
 
 */
 
-
-
 #include "HockeyCa.h"
 #include "Games.h"
-
 
 // constants
 
@@ -133,18 +130,6 @@ static PLAYER defense[NUM_DEFENSEPLAYERS];
 	p.nColumn++; \
 }
 
-static BOOL ISPUCK(int x, int y);
-static BOOL ISPUCK(int x, int y)
-{
-	if ((puck.nColumn == x)
-		&& (puck.nRow == y)
-		&& (puck.nBright)){
-		return TRUE;
-	}
-	return FALSE;
-}
-
-static BOOL ISPLAYER(int x, int y);
 static BOOL ISPLAYER(int x, int y)
 {
 	if ((player.nColumn == x)
@@ -155,7 +140,6 @@ static BOOL ISPLAYER(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISDEFENSE(int x, int y);
 static BOOL ISDEFENSE(int x, int y)
 {
 	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
@@ -168,7 +152,6 @@ static BOOL ISDEFENSE(int x, int y)
 	return FALSE;
 }
 
-static BOOL ISOCCUPIED(int x, int y);
 static BOOL ISOCCUPIED(int x, int y)
 {
 	if (ISPLAYER(x,y)){
@@ -178,18 +161,6 @@ static BOOL ISOCCUPIED(int x, int y)
 		return TRUE;
 	}
 	return FALSE;
-}
-
-static int GETPLAYERAT(int x, int y);
-static int GETPLAYERAT(int x, int y){
-	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
-		if ((defense[i].nColumn == x)
-			&& (defense[i].nRow == y)
-			&& (defense[i].nBright)){
-			return i;
-		}
-	}
-	return -1;
 }
 
 #define UNMOVEPLAYER(p) { \
@@ -224,7 +195,6 @@ static void fsmInPlay();
 static void fsmGoal();
 static void fsmGameOver();
 
-
 static enum FSM {
 	FSM_PLAYSTARTWAIT=0,
 	FSM_SHOWSTATS,
@@ -243,43 +213,7 @@ static FSMFCN fsmfcn[] = {
 	fsmGameOver
 };
 
-
-// proto's
-static void InitGame();
-static void DrawBlips();
-static void EraseBlips();
-
-
-BOOL HockeyCa_GetPower()
-{
-	return (bPower ? TRUE : FALSE);
-}
-
-void HockeyCa_PowerOn()
-{
-	InitGame();
-	bPower = TRUE;
-}
-
-void HockeyCa_PowerOff()
-{
-	bPower = FALSE;
-	HockeyCa_StopSound();
-}
-
-void HockeyCa_SetSkill(int i){
-	if (i == 0){
-		bPro2 = FALSE;
-	} else {
-		bPro2 = TRUE;
-	}
-}
-
-int HockeyCa_GetSkill(){
-	return bPro2 ? 1 : 0;
-}
-
-void InitGame()
+static void InitGame()
 {
 	bHomeTeam = FALSE;
 	PlatformSetInput(bHomeTeam);
@@ -294,40 +228,7 @@ void InitGame()
 	fsm = FSM_PLAYSTARTWAIT;
 }
 
-void HockeyCa_Run(int tu)
-{
-	int x, y;
-
-	// prevent reentrancy
-	if (bInFrame){ return; }
-	bInFrame = TRUE;
-
-	// init the blips field
-	for (y = 0; y < HOCKEYCA_BLIP_ROWS; y++){
-		for (x = 0; x < HOCKEYCA_BLIP_COLUMNS; x++){
-			Blips[x][y] = BLIP_OFF;
-		}
-	}
-
-	if (!bPower){
-		HockeyCa_ClearScreen();
-		bInFrame = FALSE;
-		return;
-	}
-
-	Platform_StartDraw();
-
-	(fsmfcn[fsm])();
-
-	DrawBlips();
-
-	Platform_EndDraw();
-
-	bInFrame = FALSE;
-
-}
-
-void DrawBlips()
+static void DrawBlips()
 {
 	int x, y, nBright;
 	static BOOL bBlink = FALSE;
@@ -390,15 +291,68 @@ void DrawBlips()
 	bBlink = !bBlink;
 }
 
-void EraseBlips()
+BOOL HockeyCa_GetPower()
 {
-	// erase the blips field
-	for (int y = 0; y < HOCKEYCA_BLIP_ROWS; y++){
-		for (int x = 0; x < HOCKEYCA_BLIP_COLUMNS; x++){
-			HockeyCa_DrawBlip(BLIP_OFF, x, y);
-		}
+	return (bPower ? TRUE : FALSE);
+}
+
+void HockeyCa_PowerOn()
+{
+	InitGame();
+	bPower = TRUE;
+}
+
+void HockeyCa_PowerOff()
+{
+	bPower = FALSE;
+	HockeyCa_StopSound();
+}
+
+void HockeyCa_SetSkill(int i){
+	if (i == 0){
+		bPro2 = FALSE;
+	} else {
+		bPro2 = TRUE;
 	}
 }
+
+int HockeyCa_GetSkill(){
+	return bPro2 ? 1 : 0;
+}
+
+void HockeyCa_Run(int tu)
+{
+	int x, y;
+
+	// prevent reentrancy
+	if (bInFrame){ return; }
+	bInFrame = TRUE;
+
+	// init the blips field
+	for (y = 0; y < HOCKEYCA_BLIP_ROWS; y++){
+		for (x = 0; x < HOCKEYCA_BLIP_COLUMNS; x++){
+			Blips[x][y] = BLIP_OFF;
+		}
+	}
+
+	if (!bPower){
+		HockeyCa_ClearScreen();
+		bInFrame = FALSE;
+		return;
+	}
+
+	Platform_StartDraw();
+
+	(fsmfcn[fsm])();
+
+	DrawBlips();
+
+	Platform_EndDraw();
+
+	bInFrame = FALSE;
+
+}
+
 
 // FINITE STATE MACHINE STUFF
 
@@ -767,20 +721,8 @@ void fsmInPlay()
 			{
 				nDefenderLast = nDefender;
 
-				PLAYER *pDefender;
-				switch(nDefender)
-				{
-					case 0:
-						pDefender = &defense[3];
-						break;
-					case 1:
-						pDefender = &defense[4];
-						break;
-					case 2:
-						pDefender = &defense[5];
-						break;
-				}
-
+				PLAYER *pDefender = &defense[3 + nDefender];
+	
 				int dx = pDefender->nColumn;
 				int dy = pDefender->nRow;
 

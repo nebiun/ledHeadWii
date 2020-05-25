@@ -2,6 +2,10 @@
  * LEDhead for Wii
  * Copyright (C) 2017-2020 Nebiun
  *
+ * Based on the handheld electronic games by Mattel Electronics.
+ * All trademarks copyrighted by their respective owners. This
+ * program is not affiliated or endorsed by Mattel Electronics.
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -15,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
- 
+
 #include "LED_Handled.h"
 #include "v_blip_png.h"
 #include "o_blip_png.h"
@@ -41,7 +45,7 @@ static inline int _drawBlip(int x, int y, int type, GRRLIB_texImg *blip)
 		idx = 0;
 		break;
 	}
-	GRRLIB_DrawTile(realx(x), realy(y), blip, 0, 1, 1, 0xFFFFFFFF, idx);
+	GRRLIB_DrawTile(realx(x), realy(y), blip, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF, idx);
 
 	return idx;
 }

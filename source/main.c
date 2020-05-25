@@ -2,6 +2,10 @@
  * LEDhead for Wii
  * Copyright (C) 2017-2020 Nebiun
  *
+ * Based on the handheld electronic games by Mattel Electronics.
+ * All trademarks copyrighted by their respective owners. This
+ * program is not affiliated or endorsed by Mattel Electronics.
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -15,6 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
 #include <sys/time.h>
 #include "LED_Handled.h"
 #include "Games.h"
@@ -24,15 +29,19 @@
 #include "WKRD_png.h"
 #include "WKLU_png.h"
 
-//#define CHECK_PAINTTIME 1
-//#define PRINT_TRACE     1
+f32 _scale_x = 1;
+f32 _scale_y = 1;
 
-#ifdef  CHECK_PAINTTIME
-struct timeval tv1, tv2;
-long delta_usec, max_delta;
+//#define CHECK_PAINTTIME	1
+//#define PRINT_COUNTER     1
+
+#ifdef CHECK_PAINTTIME
+static struct timeval tv1, tv2;
+static long delta_usec, max_delta;
 #endif
-
-int trace = 0;
+#ifdef PRINT_COUNTER
+unsigned int counter;
+#endif
 static int elapsed = 0;
 
 static void timerProc(syswd_t alarm, void *arg)
@@ -57,7 +66,7 @@ int main(int argc, char **argv)
 	GRRLIB_texImg *post_screen = NULL;
 	GRRLIB_texImg *next, *prev;
 	GRRLIB_texImg *logo;
-	u16 btn, last_btn = -1;
+	u32 btn, last_btn = -1;
 	int help_on = 0;
 	
 	GRRLIB_Init();
@@ -95,9 +104,9 @@ int main(int argc, char **argv)
 		WPAD_ScanPads();
 		
 		changed = 0;
-		btn = WPAD_ButtonsHeld(0);
+		btn = WPAD_ButtonsDown(0);
 		
-		if(last_btn == -1 || btn != last_btn) {
+		if((last_btn == -1) || (btn != last_btn)) {
 			last_btn = btn;
 
 			if(btn & WPAD_BUTTON_A)	{
@@ -137,10 +146,7 @@ int main(int argc, char **argv)
 							if(delta_usec > max_delta)
 								max_delta = delta_usec; 
 							
-							debugPrintf(300, 60, 0xFFFFFFFF, "run us=%d (max %d)", delta_usec, max_delta);
-#endif
-#ifdef PRINT_TRACE	
-							debugPrintf(300, 30, 0xFFFFFFFF, "trc=%d", trace);
+							debugPrintf(realx(game_screen->w)+10, realy(400), 0xFFFFFFFF, "run us=%d (max %d)", delta_usec, max_delta);
 #endif
 						}
 #ifdef CHECK_PAINTTIME						
@@ -152,7 +158,7 @@ int main(int argc, char **argv)
 						delta_usec = tv2.tv_sec - tv1.tv_sec;
 						delta_usec = 1000000 * delta_usec + tv2.tv_usec - tv1.tv_usec;
 						
-						debugPrintf(300, 90, 0xFFFFFFFF, "paint us=%d", delta_usec);
+						debugPrintf(realx(game_screen->w)+10, realy(420), 0xFFFFFFFF, "paint us=%d", delta_usec);
 #endif											
 						if(Platform_SoundIsOff())
 							print_text(realx(0), realy(game_screen->h + 30), 0xFFFFFFFF, "(mute)");
@@ -162,6 +168,9 @@ int main(int argc, char **argv)
 						}
 						Platform_KeyShow(realx(0), realy(game_screen->h + 60), WK_HOME);
 						print_text(realx(0 + 30), realy(game_screen->h + 60), 0xFFFFFFFF, "exit game");
+						
+						if(gCurrentGame->Debug != NULL)
+							gCurrentGame->Debug(0);
 						GRRLIB_Render();
 					}
 					gCurrentGame->DeInit();
@@ -231,10 +240,10 @@ int main(int argc, char **argv)
 			print_text(realx(0 + 30), realy(game_screen->h + 90), 0xFFFFFFFF, "for keys map");
 			if(help_on == 1 && gCurrentGame->Help != NULL)
 				gCurrentGame->Help();
-#ifdef PRINT_TRACE
-			debugPrintf(300, 30, 0xFFFFFFFF, "trc=%d",trace);
-#endif
 		}
+#ifdef PRINT_COUNTER
+		debugPrintf(realx(240)+10, realy(340), 0xFFFFFFFF, "%08d %d",counter++,btn);
+#endif
 		GRRLIB_Render();
     }
 	

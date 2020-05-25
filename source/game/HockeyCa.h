@@ -50,8 +50,9 @@ Website : http://www.peterhirschberg.com
 #define HOCKEYCA_SOUND_ENDPLAY			3
 #define HOCKEYCA_SOUND_ENDQUARTER		4
 #define HOCKEYCA_SOUND_ENDGAME			5
+#define HOCKEYCA_SOUND_NSOUNDS			6
 
-void HockeyCa_Run();
+void HockeyCa_Run(int tu);
 void HockeyCa_SetSkill(int i);
 int HockeyCa_GetSkill();
 void HockeyCa_PowerOn();

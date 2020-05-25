@@ -34,26 +34,11 @@ Website : http://www.peterhirschberg.com
 */
 
 #include "autorace.h"
+#include "slide1_png.h"
 #include "skislalom_screen_png.h"
-#include "skislalom_poweroff_png.h"
-#include "skislalom_poweron_png.h"
-#include "skislalom_gear1_png.h"
-#include "skislalom_gear2_png.h"
-#include "skislalom_gear3_png.h"
-#include "skislalom_gear4_png.h"
-#include "skislalom_aimleft_png.h"
-#include "skislalom_aimcenter_png.h"
-#include "skislalom_aimright_png.h"
+#include "skislalom_slide_png.h"
 #include "autorace_screen_png.h"
-#include "autorace_poweroff_png.h"
-#include "autorace_poweron_png.h"
-#include "autorace_gear1_png.h"
-#include "autorace_gear2_png.h"
-#include "autorace_gear3_png.h"
-#include "autorace_gear4_png.h"
-#include "autorace_aimleft_png.h"
-#include "autorace_aimcenter_png.h"
-#include "autorace_aimright_png.h"
+#include "autorace_slide_png.h"
 #include "autorace_gear1_raw.h"
 #include "autorace_gear2_raw.h"
 #include "autorace_gear3_raw.h"
@@ -70,15 +55,8 @@ Website : http://www.peterhirschberg.com
 #include "skislalom_win_raw.h"	
 // images
 static GRRLIB_texImg *bmpScreen;
-static GRRLIB_texImg *bmpPowerOff;
-static GRRLIB_texImg *bmpPowerOn;
-static GRRLIB_texImg *bmpGear1;
-static GRRLIB_texImg *bmpGear2;
-static GRRLIB_texImg *bmpGear3;
-static GRRLIB_texImg *bmpGear4;
-static GRRLIB_texImg *bmpAimLeft;
-static GRRLIB_texImg *bmpAimCenter;
-static GRRLIB_texImg *bmpAimRight;
+static GRRLIB_texImg *bmpPowerSlide;
+static GRRLIB_texImg *bmpSlide;
 
 static int nStick = 1;
 
@@ -96,7 +74,7 @@ static BOOL bSkiSlalom = FALSE;
 static void StartEngineSound();
 static void StopEngineSound();
 
-static Sound_t tcWaveRes[7];
+static Sound_t tcWaveRes[AUTORACE_SOUND_NSOUNDS];
 static Blip_t blip[AUTORACE_BLIP_COLUMNS][AUTORACE_BLIP_ROWS];
 static Stat_t digit[2];
 static Coord_t i_slider, i_power, i_gear;
@@ -135,25 +113,18 @@ void SkiSlalom_Init()
 	bSkiSlalom = TRUE;
 
 	// Init sounds
-	Sound_set(&tcWaveRes[0], skislalom_gear1_raw, skislalom_gear1_raw_size, 1324);
-	Sound_set(&tcWaveRes[1], skislalom_gear2_raw, skislalom_gear2_raw_size, 1051);
-	Sound_set(&tcWaveRes[2], skislalom_gear3_raw, skislalom_gear3_raw_size, 1045);
-	Sound_set(&tcWaveRes[3], skislalom_gear4_raw, skislalom_gear4_raw_size, 852);
-	Sound_set(&tcWaveRes[4], skislalom_hit_raw, skislalom_hit_raw_size, 137);
-	Sound_set(&tcWaveRes[5], skislalom_time_raw, skislalom_time_raw_size, 937);
-	Sound_set(&tcWaveRes[6], skislalom_win_raw, skislalom_win_raw_size, 1275);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_GEAR0], skislalom_gear1_raw, skislalom_gear1_raw_size, 1324);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_GEAR1], skislalom_gear2_raw, skislalom_gear2_raw_size, 1051);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_GEAR2], skislalom_gear3_raw, skislalom_gear3_raw_size, 1045);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_GEAR3], skislalom_gear4_raw, skislalom_gear4_raw_size, 852);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_HIT], skislalom_hit_raw, skislalom_hit_raw_size, 137);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_TIME], skislalom_time_raw, skislalom_time_raw_size, 937);
+	Sound_set(&tcWaveRes[AUTORACE_SOUND_WIN], skislalom_win_raw, skislalom_win_raw_size, 1275);
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(skislalom_screen_png);
-	bmpPowerOff = GRRLIB_LoadTexture(skislalom_poweroff_png);
-	bmpPowerOn = GRRLIB_LoadTexture(skislalom_poweron_png);
-	bmpGear1 = GRRLIB_LoadTexture(skislalom_gear1_png);
-	bmpGear2 = GRRLIB_LoadTexture(skislalom_gear2_png);
-	bmpGear3 = GRRLIB_LoadTexture(skislalom_gear3_png);
-	bmpGear4 = GRRLIB_LoadTexture(skislalom_gear4_png);	
-	bmpAimLeft = GRRLIB_LoadTexture(skislalom_aimleft_png);
-	bmpAimCenter = GRRLIB_LoadTexture(skislalom_aimcenter_png);
-	bmpAimRight = GRRLIB_LoadTexture(skislalom_aimright_png);
+	bmpPowerSlide = GRRLIB_LoadTexture(slide1_png);
+	bmpSlide = GRRLIB_LoadTexture(skislalom_slide_png);
 	
 	// images position
 	i_slider.x = skislalom_slider_x;
@@ -211,15 +182,8 @@ void AutoRace_Init()
 
 	// load images
 	bmpScreen = GRRLIB_LoadTexture(autorace_screen_png);
-	bmpPowerOff = GRRLIB_LoadTexture(autorace_poweroff_png);
-	bmpPowerOn = GRRLIB_LoadTexture(autorace_poweron_png);
-	bmpGear1 = GRRLIB_LoadTexture(autorace_gear1_png);
-	bmpGear2 = GRRLIB_LoadTexture(autorace_gear2_png);
-	bmpGear3 = GRRLIB_LoadTexture(autorace_gear3_png);
-	bmpGear4 = GRRLIB_LoadTexture(autorace_gear4_png);
-	bmpAimLeft = GRRLIB_LoadTexture(autorace_aimleft_png);
-	bmpAimCenter = GRRLIB_LoadTexture(autorace_aimcenter_png);
-	bmpAimRight = GRRLIB_LoadTexture(autorace_aimright_png);
+	bmpPowerSlide = GRRLIB_LoadTexture(slide1_png);
+	bmpSlide = GRRLIB_LoadTexture(autorace_slide_png);
 	
 	// images position
 	i_slider.x = autorace_slider_x;
@@ -260,22 +224,24 @@ void AutoRace_Init()
 	}
 }
 
+void AutoRace_StopSound()
+{
+	bEngineSoundPlaying = FALSE;
+	bEngineSound = FALSE;
+
+	// stop all sounds...
+	Platform_StopSound();
+}
+
 void AutoRace_DeInit()
 {
 	// stop all sounds...
-	Platform_StopSound();
-
-	bEngineSoundPlaying = FALSE;
+	AutoRace_StopSound();
+	AutoRace_PowerOff();
 	GRRLIB_FreeTexture(bmpScreen);
-	GRRLIB_FreeTexture(bmpPowerOff);
-	GRRLIB_FreeTexture(bmpPowerOn);
-	GRRLIB_FreeTexture(bmpGear1);
-	GRRLIB_FreeTexture(bmpGear2);
-	GRRLIB_FreeTexture(bmpGear3);
-	GRRLIB_FreeTexture(bmpGear4);
-	GRRLIB_FreeTexture(bmpAimLeft);
-	GRRLIB_FreeTexture(bmpAimCenter);
-	GRRLIB_FreeTexture(bmpAimRight);
+	GRRLIB_FreeTexture(bmpPowerSlide);
+	GRRLIB_FreeTexture(bmpSlide);
+	destroy_gear();
 	bInited = FALSE;
 }
 
@@ -292,42 +258,29 @@ void AutoRace_Paint()
 		AutoRace_PowerOn();
 	}	
 	// paint the backdrop
-	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, 1, 1, 0xFFFFFFFF);
+	GRRLIB_DrawImg(realx(0), realy(0), bmpScreen, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	
 	// draw gear
-	switch (AutoRace_GetSkill())
-	{
-	case 0:
-		GRRLIB_DrawImg(realx(i_gear.x), realy(i_gear.y), bmpGear1, 0, 1, 1, 0xFFFFFFFF);
-		break;
-	case 1:
-		GRRLIB_DrawImg(realx(i_gear.x), realy(i_gear.y), bmpGear2, 0, 1, 1, 0xFFFFFFFF);
-		break;
-	case 2:
-		GRRLIB_DrawImg(realx(i_gear.x), realy(i_gear.y), bmpGear3, 0, 1, 1, 0xFFFFFFFF);
-		break;
-	case 3:
-		GRRLIB_DrawImg(realx(i_gear.x), realy(i_gear.y), bmpGear4, 0, 1, 1, 0xFFFFFFFF);
-		break;
-	}
+	draw_gear(i_gear.x, i_gear.y, 4 - AutoRace_GetSkill());
 	
 	// Draw stick
-	switch (nStick)
-	{
+	switch (nStick) {
 	case 0:
-		GRRLIB_DrawImg(realx(i_slider.x), realy(i_slider.y), bmpAimLeft, 0, 1, 1, 0xFFFFFFFF);
-		break;
-	case 1:
-		GRRLIB_DrawImg(realx(i_slider.x), realy(i_slider.y), bmpAimCenter, 0, 1, 1, 0xFFFFFFFF);
+		x = 2;
 		break;
 	case 2:
-		GRRLIB_DrawImg(realx(i_slider.x), realy(i_slider.y), bmpAimRight, 0, 1, 1, 0xFFFFFFFF);
+		x = 27;
+		break;
+	case 1:
+	default:
+		x = 15;
 		break;
 	}
+	GRRLIB_DrawImg(realx(i_slider.x+x), realy(i_slider.y), bmpSlide, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 		
 	// Draw power	
 	if (power) {
-		GRRLIB_DrawImg(realx(i_power.x), realy(i_power.y), bmpPowerOn, 0, 1, 1, 0xFFFFFFFF);
+		GRRLIB_DrawImg(realx(i_power.x), realy(i_power.y+3), bmpPowerSlide, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 		for (y = 0; y < AUTORACE_BLIP_ROWS; y++){
 			for (x = 0; x < AUTORACE_BLIP_COLUMNS; x++){
 				if(blip[x][y].status != -1)
@@ -338,7 +291,7 @@ void AutoRace_Paint()
 			draw_digit(digit[x].x, digit[x].y, digit[x].val);
 	}
 	else {
-		GRRLIB_DrawImg(realx(i_power.x), realy(i_power.y), bmpPowerOff, 0, 1, 1, 0xFFFFFFFF);
+		GRRLIB_DrawImg(realx(i_power.x), realy(i_power.y+16), bmpPowerSlide, 0, SCALE_X, SCALE_Y, 0xFFFFFFFF);
 	}
 
 }
@@ -374,16 +327,6 @@ void AutoRace_PlaySound(int nSound, unsigned int nFlags)
 
 	Platform_PlaySound(&tcWaveRes[nSound], nFlags);
 }
-
-void AutoRace_StopSound()
-{
-	bEngineSoundPlaying = FALSE;
-	bEngineSound = FALSE;
-
-	// stop all sounds...
-	Platform_StopSound();
-}
-
 
 //----------------------------------------------------------------------------
 // local fcn's

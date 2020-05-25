@@ -53,37 +53,37 @@ Website : http://www.peterhirschberg.com
 #define baseball_digit_h 9
 
 // blips for normal pitches
-#define baseball_blip_pitch_1_x 118
+#define baseball_blip_pitch_1_x 117
 #define baseball_blip_pitch_1_y 151
-#define baseball_blip_pitch_2_x 118
+#define baseball_blip_pitch_2_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_2_y 167
-#define baseball_blip_pitch_3_x 118
+#define baseball_blip_pitch_3_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_3_y 182
-#define baseball_blip_pitch_4_x 118
+#define baseball_blip_pitch_4_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_4_y 197
-#define baseball_blip_pitch_5_x 118
+#define baseball_blip_pitch_5_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_5_y 211
-#define baseball_blip_pitch_6_x 118
+#define baseball_blip_pitch_6_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_6_y 225
-#define baseball_blip_pitch_7_x 118
+#define baseball_blip_pitch_7_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_7_y 236
-#define baseball_blip_pitch_8_x 118
+#define baseball_blip_pitch_8_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_8_y 248
-#define baseball_blip_pitch_9_x 118
+#define baseball_blip_pitch_9_x baseball_blip_pitch_1_x
 #define baseball_blip_pitch_9_y 256
 
 // blips for curve balls
 #define baseball_blip_pitchcurve_2_x 123
-#define baseball_blip_pitchcurve_2_y 166
+#define baseball_blip_pitchcurve_2_y 167
 #define baseball_blip_pitchcurve_3_x 125
-#define baseball_blip_pitchcurve_3_y 181
+#define baseball_blip_pitchcurve_3_y 182
 #define baseball_blip_pitchcurve_4_x 125
-#define baseball_blip_pitchcurve_4_y 196
+#define baseball_blip_pitchcurve_4_y 197
 #define baseball_blip_pitchcurve_5_x 123
-#define baseball_blip_pitchcurve_5_y 210
+#define baseball_blip_pitchcurve_5_y 211
 
 // home plate -> 1st base
-#define baseball_blip_base_0_x 118
+#define baseball_blip_base_0_x baseball_blip_pitch_1_x
 #define baseball_blip_base_0_y 236
 #define baseball_blip_base_0A_x 138
 #define baseball_blip_base_0A_y 215
@@ -130,22 +130,36 @@ Website : http://www.peterhirschberg.com
 #define baseball_blip_outfield_right_x 184
 #define baseball_blip_outfield_right_y 85
 
-// interface that the platform must provide for this game
+#define NORMAL_BALL(x)	(x)
+#define CURVE_BALL(x)	(((x)>=1 && (x)<=4) ? ((x)-1+9) : NORMAL_BALL(x))
+#define HOME_PLATE		13
+#define BASE(x)			(HOME_PLATE+(3*(x)))
+#define DIAMOND(x)		(HOME_PLATE+(x))
+#define DEEP_1ST		25
+#define DEEP_3RD		26
+#define OUT_LEFT		27
+#define OUT_CENTER		28
+#define OUT_RIGHT		29
 
-// functions exported to the game context
+#define BASEBALL_NBLIPS			(OUT_RIGHT+1)
+
+// interface that the platform must provide for this game
 void Baseball_Init();
 void Baseball_Help();
 void Baseball_DeInit();
 void Baseball_Paint();
-void Baseball_PlaySound(int nSound, unsigned int nFlags);
-void Baseball_StopSound();
 void Baseball_GetSize(int *w, int *h);
+void Baseball_SetSkill(int i);
+int Baseball_GetSkill();
+void Baseball_PowerOn();
+void Baseball_PowerOff();
+int Baseball_GetPower();
+
+// functions exported to the game context
+void Baseball_PlaySound(int nSound, unsigned int nFlags);
 
 // "private" functions not exported to game context
-void Baseball_DrawPitchBlip(BOOL state, int index, BOOL curve);
-void Baseball_DrawBaseBlip(BOOL state, int index);
-void Baseball_DrawOutfieldBlip(BOOL state, int index);
-void Baseball_DrawDeepBlip(BOOL state, int index);
+void Baseball_DrawBlip(BOOL state, int index);
 
 void Baseball_DrawStats(int innings, int outs, int balls, int strikes, BOOL bHomeTeam);
 void Baseball_DrawScore(int vruns, int hruns);

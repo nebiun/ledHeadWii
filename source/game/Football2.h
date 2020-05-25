@@ -45,23 +45,24 @@ Website : http://www.peterhirschberg.com
 #define FOOTBALL2_BLIP_ROWS		3
 #define FOOTBALL2_BLIP_COLUMNS	10
 
-#define FOOTBALL2_SOUND_CHARGESTART	0
-#define FOOTBALL2_SOUND_CHARGE		1
+#define FOOTBALL2_SOUND_CHARGESTART		0
+#define FOOTBALL2_SOUND_CHARGE			1
 #define FOOTBALL2_SOUND_TICK			2
-#define FOOTBALL2_SOUND_RUNBACK		3
+#define FOOTBALL2_SOUND_RUNBACK			3
 #define FOOTBALL2_SOUND_FIRSTDOWN		4
-#define FOOTBALL2_SOUND_ENDPLAY		5
+#define FOOTBALL2_SOUND_ENDPLAY			5
 #define FOOTBALL2_SOUND_ENDPOSSESSION	6
-#define FOOTBALL2_SOUND_ENDQUARTER	7
+#define FOOTBALL2_SOUND_ENDQUARTER		7
 #define FOOTBALL2_SOUND_TOUCHDOWN		8
-#define FOOTBALL2_SOUND_SAFETY		9
+#define FOOTBALL2_SOUND_SAFETY			9
+#define FOOTBALL2_SOUND_NSOUNDS			10
 
-void Football2_Run();
+void Football2_Run(int tu);
 void Football2_SetSkill(int i);
 int Football2_GetSkill();
 void Football2_PowerOn();
 void Football2_PowerOff();
 int Football2_GetPower();
-
+void Football2_Debug();
 
 #endif
