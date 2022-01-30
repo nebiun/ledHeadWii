@@ -50,6 +50,7 @@ static Blip_t blip[SOCCER_BLIP_COLUMNS][SOCCER_BLIP_ROWS];
 static Blip_t goal;
 static Stat_t digit[2];
 static Help_t help[] = {
+	{ WK_1, { 34, 243} },
 	{ WK_2, { 180, 243} },
 	{ WK_BLR, { 25, 285 } },
 	{ WK_DPAD, { 105, 252} }

@@ -52,8 +52,9 @@ static Sound_t tcWaveRes[HOCKEY_SOUND_NSOUNDS];
 static Blip_t blip[HOCKEY_BLIP_COLUMNS][HOCKEY_BLIP_ROWS];
 static Stat_t digit[2];
 static Help_t help[] = {
+	{ WK_1, { 34, 243} },
 	{ WK_2, { 181, 243} },
-	{ WK_BLR, { 24, 286 } },
+	{ WK_BLR, { 24, 286} },
 	{ WK_DPAD, { 104, 252} }
 };
 //----------------------------------------------------------------------------

@@ -50,6 +50,7 @@ static Blip_t blip[BASKETBALL_BLIP_COLUMNS][BASKETBALL_BLIP_ROWS];
 static Blip_t basket;
 static Stat_t digit[2];
 static Help_t help[] = {
+	{ WK_1, { 34, 232 } },
 	{ WK_2, { 183, 232} },
 	{ WK_BLR, {27, 275} },
 	{ WK_DPAD, { 105, 242} }
