@@ -23,6 +23,7 @@
 #ifndef _LED_Handled_h_
 #define _LED_Handled_h_
 #include <stdlib.h>
+#include <stdio.h>
 #include <wiiuse/wpad.h>
 #include <stdarg.h>
 #include <asndlib.h>

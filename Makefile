@@ -82,10 +82,8 @@ export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES)))
 #---------------------------------------------------------------------------------
 # build a list of include paths
 #---------------------------------------------------------------------------------
-INCLUDEDIR := $(foreach dir,$(LIBDIRS),$(dir $(wildcard $(dir)/include/*/)))
 export INCLUDE	:=	$(foreach dir,$(INCLUDES), -iquote $(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-					$(foreach dir,$(INCLUDEDIR),-I$(dir)) \
 					-I$(CURDIR)/include \
 					-I$(CURDIR)/$(BUILD) \
 					-I$(LIBOGC_INC)

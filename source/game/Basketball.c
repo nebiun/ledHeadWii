@@ -131,16 +131,6 @@ static PLAYER defense[NUM_DEFENSEPLAYERS];
 	p.nColumn++; \
 }
 
-static BOOL ISBALL(int x, int y)
-{
-	if ((ball.nColumn == x)
-		&& (ball.nRow == y)
-		&& (ball.nBright)){
-		return TRUE;
-	}
-	return FALSE;
-}
-
 static BOOL ISPLAYER(int x, int y)
 {
 	if ((player.nColumn == x)
@@ -172,17 +162,6 @@ static BOOL ISOCCUPIED(int x, int y)
 		return TRUE;
 	}
 	return FALSE;
-}
-
-static int GETPLAYERAT(int x, int y){
-	for (int i=0; i<NUM_DEFENSEPLAYERS; i++){
-		if ((defense[i].nColumn == x)
-			&& (defense[i].nRow == y)
-			&& (defense[i].nBright)){
-			return i;
-		}
-	}
-	return -1;
 }
 
 #define UNMOVEPLAYER(p) { \
@@ -629,6 +608,7 @@ void fsmInPlay()
 						oy = 1;
 						break;
 					case 2:
+					default:
 						pDefender = &defense[4];
 						ox = 3;
 						oy = 1;
@@ -715,6 +695,7 @@ void fsmInPlay()
 						pDefender = &defense[3];
 						break;
 					case 2:
+					default:
 						pDefender = &defense[4];
 						break;
 				}
